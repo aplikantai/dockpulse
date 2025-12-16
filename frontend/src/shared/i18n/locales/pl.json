@@ -1,0 +1,106 @@
+{
+  "common": {
+    "save": "Zapisz",
+    "cancel": "Anuluj",
+    "delete": "Usun",
+    "edit": "Edytuj",
+    "create": "Utworz",
+    "search": "Szukaj",
+    "loading": "Ladowanie...",
+    "noResults": "Brak wynikow",
+    "error": "Blad",
+    "success": "Sukces",
+    "confirm": "Potwierdz",
+    "back": "Wstecz",
+    "next": "Dalej",
+    "submit": "Wyslij",
+    "close": "Zamknij",
+    "actions": "Akcje"
+  },
+  "auth": {
+    "login": "Zaloguj sie",
+    "logout": "Wyloguj sie",
+    "phone": "Numer telefonu",
+    "email": "Email",
+    "password": "Haslo",
+    "forgotPassword": "Zapomniałeś hasła?",
+    "register": "Zarejestruj sie",
+    "loginTitle": "Zaloguj sie do konta",
+    "invalidCredentials": "Nieprawidlowy numer telefonu lub haslo",
+    "sessionExpired": "Twoja sesja wygasla. Zaloguj sie ponownie."
+  },
+  "nav": {
+    "dashboard": "Panel",
+    "orders": "Zamowienia",
+    "customers": "Klienci",
+    "products": "Produkty",
+    "settings": "Ustawienia",
+    "auditLog": "Dziennik zdarzen"
+  },
+  "order": {
+    "title": "Zamowienia",
+    "new": "Nowe zamowienie",
+    "number": "Zamowienie #",
+    "client": "Klient",
+    "notes": "Notatki",
+    "items": "Pozycje",
+    "comments": "Komentarze",
+    "attachments": "Zalaczniki",
+    "assignedTo": "Przypisane do",
+    "createdBy": "Utworzone przez",
+    "createdAt": "Utworzono",
+    "updatedAt": "Zaktualizowano",
+    "dueDate": "Termin",
+    "status": {
+      "label": "Status",
+      "NEW": "Nowe",
+      "CONFIRMED": "Potwierdzone",
+      "IN_PROGRESS": "W realizacji",
+      "READY": "Gotowe",
+      "COMPLETED": "Zakonczone",
+      "CANCELLED": "Anulowane"
+    },
+    "priority": {
+      "label": "Priorytet",
+      "LOW": "Niski",
+      "NORMAL": "Normalny",
+      "HIGH": "Wysoki",
+      "URGENT": "Pilny"
+    }
+  },
+  "customer": {
+    "title": "Klienci",
+    "new": "Nowy klient",
+    "name": "Nazwa",
+    "phone": "Telefon",
+    "email": "Email",
+    "company": "Firma",
+    "address": "Adres"
+  },
+  "product": {
+    "title": "Produkty",
+    "new": "Nowy produkt",
+    "sku": "SKU",
+    "name": "Nazwa",
+    "price": "Cena",
+    "unit": "Jednostka"
+  },
+  "portal": {
+    "title": "Portal Klienta",
+    "myOrders": "Moje zamowienia",
+    "newOrder": "Zloz nowe zamowienie",
+    "trackStatus": "Sledz status",
+    "orderHistory": "Historia zamowien",
+    "addComment": "Dodaj komentarz",
+    "uploadFiles": "Dodaj pliki",
+    "welcome": "Witaj w portalu"
+  },
+  "audit": {
+    "title": "Dziennik zdarzen",
+    "action": "Akcja",
+    "user": "Uzytkownik",
+    "timestamp": "Data i czas",
+    "entity": "Obiekt",
+    "details": "Szczegoly"
+  }
+}
