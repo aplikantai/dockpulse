@@ -424,6 +424,157 @@ Model wzorowany na Bukieteria/Tapparella:
 
 ---
 
-**Wersja**: 2.0
-**Podejscie**: No-Code
+## 13. AUTO-BRANDING (Inteligentny Onboarding)
+
+### 13.1. Koncept
+
+Uzytkownik podaje tylko **adres strony WWW** swojej firmy, a system automatycznie:
+- Pobiera logo i favicon
+- Ekstraktuje dane firmy (nazwa, NIP, adres, kontakt)
+- Wykrywa kolory brandingu z logo
+- Automatycznie styluje UI platformy
+
+### 13.2. Pipeline Auto-Brandingu
+
+```
+URL strony WWW
+     │
+     ▼
+┌─────────────────────────┐
+│  1. Fetch HTML          │
+│     (axios + cheerio)   │
+└────────────┬────────────┘
+             │
+             ▼
+┌─────────────────────────┐
+│  2. LLM Extraction      │
+│     (OpenRouter)        │
+│  - Nazwa firmy          │
+│  - NIP, adres, kontakt  │
+│  - URL logo/favicon     │
+└────────────┬────────────┘
+             │
+             ▼
+┌─────────────────────────┐
+│  3. Vision AI           │
+│  - Ekstrakcja kolorow   │
+│  - primary, secondary   │
+│  - accent               │
+└────────────┬────────────┘
+             │
+             ▼
+┌─────────────────────────┐
+│  4. Upload Assets       │
+│  - Logo → S3            │
+│  - Favicon → S3         │
+└────────────┬────────────┘
+             │
+             ▼
+┌─────────────────────────┐
+│  5. Apply Branding      │
+│  - CSS Variables        │
+│  - Tailwind config      │
+│  - Tenant settings      │
+└─────────────────────────┘
+```
+
+### 13.3. LLM Models (OpenRouter - Free Tier)
+
+| Model | Zastosowanie | Koszt |
+|-------|--------------|-------|
+| `meta-llama/llama-3.2-3b-instruct:free` | Ekstrakcja danych z HTML | Free |
+| `google/gemini-2.0-flash-exp:free` | Vision - ekstrakcja kolorow | Free |
+| `qwen/qwen-2-7b-instruct:free` | Fallback | Free |
+
+### 13.4. Struktura BrandingSettings
+
+```typescript
+interface BrandingSettings {
+  logoUrl: string;           // URL logo w S3
+  faviconUrl: string;        // URL favicon w S3
+  companyName: string;       // Nazwa firmy
+  colors: {
+    primary: string;         // #RRGGBB - glowny kolor
+    secondary: string;       // #RRGGBB - drugoplanowy
+    accent: string;          // #RRGGBB - akcent
+  };
+  fonts?: {
+    heading: string;         // Font naglowkow
+    body: string;            // Font tekstu
+  };
+  companyData?: {
+    nip?: string;
+    address?: Address;
+    phone?: string;
+    email?: string;
+  };
+}
+```
+
+### 13.5. Dynamiczne CSS Variables
+
+```css
+:root {
+  /* Auto-generated from branding */
+  --color-primary: #2B579A;
+  --color-secondary: #4472C4;
+  --color-accent: #70AD47;
+
+  /* Generated shades */
+  --color-primary-50: #EBF0F7;
+  --color-primary-100: #D6E1EF;
+  --color-primary-500: #2B579A;
+  --color-primary-600: #234A82;
+  --color-primary-900: #0F1F35;
+}
+```
+
+### 13.6. Komponenty Auto-Branded
+
+**Navbar z logo klienta:**
+```tsx
+<nav className="glass-nav">
+  <img src={tenant.branding.logoUrl} alt={tenant.name} />
+  <span style={{ color: tenant.branding.colors.primary }}>
+    {tenant.branding.companyName}
+  </span>
+</nav>
+```
+
+**Button z primary color:**
+```tsx
+<button style={{ background: tenant.branding.colors.primary }}>
+  {children}
+</button>
+```
+
+### 13.7. Fallback Behavior
+
+Jesli ekstrakcja sie nie powiedzie:
+- Logo: placeholder z inicjalami firmy
+- Kolory: domyslna paleta DockPulse
+- Dane: uzytkownik wprowadza recznie
+
+---
+
+## 14. SLOWNIK POJEC (rozszerzony)
+
+| Pojecie | Definicja |
+|---------|-----------|
+| **Tenant** | Firma-klient korzystajaca z DockPulse |
+| **Szablon** | Predefiniowany zestaw modulow/pol dla branzy |
+| **Modul** | Funkcjonalny komponent (@orders, @customers) |
+| **Event Bus** | Szyna danych - kanal komunikacji modulow |
+| **Portal** | Interfejs self-service dla klientow tenanta |
+| **Trigger** | Automatyczna akcja po zdarzeniu (on/off) |
+| **Encja** | Obiekt biznesowy (Order, Customer, Product) |
+| **No-Code** | Konfiguracja przez UI bez pisania kodu |
+| **Glassmorphism** | Styl UI - blur, przezroczystosc, cienie |
+| **Auto-Branding** | Automatyczne pobieranie brandingu z URL |
+| **OpenRouter** | Gateway do wielu modeli LLM |
+
+---
+
+**Wersja**: 2.1
+**Podejscie**: No-Code + Auto-Branding
 **Data**: Grudzien 2024

@@ -30,6 +30,7 @@ export interface Tenant {
   template: TemplateType;
   status: TenantStatus;
   settings: TenantSettings;
+  branding?: BrandingSettings;  // Auto-Branding settings
   createdAt: Date;
   updatedAt: Date;
 }
@@ -183,4 +184,55 @@ export interface JwtPayload {
   role?: UserRole;
   iat: number;
   exp: number;
+}
+
+// ===========================================
+// BRANDING TYPES (Auto-Branding)
+// ===========================================
+
+export interface BrandColors {
+  primary: string;    // #RRGGBB
+  secondary: string;  // #RRGGBB
+  accent: string;     // #RRGGBB
+}
+
+export interface BrandFonts {
+  heading?: string;
+  body?: string;
+}
+
+export interface BrandingSettings {
+  logoUrl: string;
+  faviconUrl: string;
+  companyName: string;
+  colors: BrandColors;
+  fonts?: BrandFonts;
+  companyData?: BrandingCompanyData;
+}
+
+export interface BrandingCompanyData {
+  nip?: string;
+  address?: Address;
+  phone?: string;
+  email?: string;
+}
+
+export interface BrandingResult {
+  companyData: {
+    name: string;
+    nip?: string;
+    address?: Address;
+    phone?: string;
+    email?: string;
+  };
+  branding: {
+    logoUrl: string;
+    faviconUrl: string;
+    colors: BrandColors;
+  };
+}
+
+export interface ExtractBrandingRequest {
+  websiteUrl: string;
+  tenantSlug?: string;
 }

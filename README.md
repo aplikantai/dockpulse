@@ -14,6 +14,7 @@ DockPulse to platforma SaaS oferujaca gotowe szablony branzowe z predefiniowanym
 - **Subdomeny**: `tenant.dockpulse.com`
 - **Event Bus**: PostgreSQL LISTEN/NOTIFY
 - **No-Code**: gotowe moduly on/off, predefiniowane pola, triggery on/off
+- **Auto-Branding**: automatyczne pobieranie logo, kolorow i danych firmy z URL
 - **AI**: asystent konfiguracji (sugestie), NIE generator kodu
 - **Portal klienta**: logowanie przez telefon
 - **Design**: iOS glassmorphism (blur, przezroczystosc)
