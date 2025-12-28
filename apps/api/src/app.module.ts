@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
+import { PrismaModule } from './modules/database/prisma.module';
 import { StorageModule } from './modules/storage/storage.module';
 import { BrandingModule } from './modules/branding/branding.module';
 
@@ -9,6 +10,7 @@ import { BrandingModule } from './modules/branding/branding.module';
       isGlobal: true,
       envFilePath: ['.env.local', '.env'],
     }),
+    PrismaModule,
     StorageModule,
     BrandingModule,
   ],

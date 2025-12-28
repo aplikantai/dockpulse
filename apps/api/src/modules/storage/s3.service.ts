@@ -1,29 +1,62 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import {
   S3Client,
   PutObjectCommand,
   GetObjectCommand,
   DeleteObjectCommand,
+  HeadBucketCommand,
+  CreateBucketCommand,
 } from '@aws-sdk/client-s3';
+import { UploadResult, StorageConfig } from './interfaces/storage.interface';
 
 @Injectable()
-export class S3Service {
+export class S3Service implements OnModuleInit {
   private readonly logger = new Logger(S3Service.name);
-  private readonly s3Client: S3Client;
-  private readonly bucket: string;
+  private s3Client: S3Client;
+  private config: StorageConfig;
 
-  constructor() {
-    this.bucket = process.env.S3_BUCKET || 'dockpulse';
+  async onModuleInit() {
+    this.config = {
+      endpoint: process.env.S3_ENDPOINT || 'http://localhost:9000',
+      accessKey: process.env.S3_ACCESS_KEY || 'dockpulse',
+      secretKey: process.env.S3_SECRET_KEY || 'dockpulse_dev',
+      bucket: process.env.S3_BUCKET || 'dockpulse',
+      region: process.env.S3_REGION || 'us-east-1',
+      publicUrl: process.env.S3_PUBLIC_URL,
+    };
 
     this.s3Client = new S3Client({
-      endpoint: process.env.S3_ENDPOINT || 'http://localhost:9000',
-      region: process.env.S3_REGION || 'us-east-1',
+      endpoint: this.config.endpoint,
+      region: this.config.region,
       credentials: {
-        accessKeyId: process.env.S3_ACCESS_KEY || 'dockpulse',
-        secretAccessKey: process.env.S3_SECRET_KEY || 'dockpulse_dev',
+        accessKeyId: this.config.accessKey,
+        secretAccessKey: this.config.secretKey,
       },
       forcePathStyle: true, // Required for MinIO
     });
+
+    await this.ensureBucketExists();
+  }
+
+  /**
+   * Ensure S3 bucket exists, create if not
+   */
+  private async ensureBucketExists(): Promise<void> {
+    try {
+      await this.s3Client.send(new HeadBucketCommand({ Bucket: this.config.bucket }));
+      this.logger.log(`Bucket "${this.config.bucket}" exists`);
+    } catch (error: any) {
+      if (error.name === 'NotFound' || error.$metadata?.httpStatusCode === 404) {
+        try {
+          await this.s3Client.send(new CreateBucketCommand({ Bucket: this.config.bucket }));
+          this.logger.log(`Bucket "${this.config.bucket}" created`);
+        } catch (createError: any) {
+          this.logger.warn(`Could not create bucket: ${createError.message}`);
+        }
+      } else {
+        this.logger.warn(`Could not check bucket: ${error.message}`);
+      }
+    }
   }
 
   /**
@@ -33,10 +66,12 @@ export class S3Service {
     key: string,
     buffer: Buffer,
     contentType: string = 'application/octet-stream',
-  ): Promise<string> {
+  ): Promise<UploadResult> {
+    const startTime = Date.now();
+
     try {
       const command = new PutObjectCommand({
-        Bucket: this.bucket,
+        Bucket: this.config.bucket,
         Key: key,
         Body: buffer,
         ContentType: contentType,
@@ -44,11 +79,16 @@ export class S3Service {
 
       await this.s3Client.send(command);
 
-      const publicUrl = this.getPublicUrl(key);
-      this.logger.log(`File uploaded: ${publicUrl}`);
+      const url = this.getPublicUrl(key);
+      this.logger.log(`Uploaded ${key} in ${Date.now() - startTime}ms`);
 
-      return publicUrl;
-    } catch (error) {
+      return {
+        key,
+        url,
+        contentType,
+        size: buffer.length,
+      };
+    } catch (error: any) {
       this.logger.error(`Failed to upload ${key}: ${error.message}`);
       throw new Error(`S3 upload failed: ${error.message}`);
     }
@@ -61,12 +101,15 @@ export class S3Service {
     key: string,
     url: string,
     contentType?: string,
-  ): Promise<string> {
+  ): Promise<UploadResult> {
     try {
       const axios = (await import('axios')).default;
       const response = await axios.get(url, {
         responseType: 'arraybuffer',
         timeout: 30000,
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (compatible; DockPulse/1.0)',
+        },
       });
 
       const buffer = Buffer.from(response.data);
@@ -76,7 +119,7 @@ export class S3Service {
         'application/octet-stream';
 
       return this.upload(key, buffer, detectedContentType);
-    } catch (error) {
+    } catch (error: any) {
       this.logger.error(`Failed to upload from URL ${url}: ${error.message}`);
       throw new Error(`S3 upload from URL failed: ${error.message}`);
     }
@@ -88,7 +131,7 @@ export class S3Service {
   async download(key: string): Promise<Buffer> {
     try {
       const command = new GetObjectCommand({
-        Bucket: this.bucket,
+        Bucket: this.config.bucket,
         Key: key,
       });
 
@@ -100,7 +143,7 @@ export class S3Service {
       }
 
       return Buffer.concat(chunks);
-    } catch (error) {
+    } catch (error: any) {
       this.logger.error(`Failed to download ${key}: ${error.message}`);
       throw new Error(`S3 download failed: ${error.message}`);
     }
@@ -112,13 +155,13 @@ export class S3Service {
   async delete(key: string): Promise<void> {
     try {
       const command = new DeleteObjectCommand({
-        Bucket: this.bucket,
+        Bucket: this.config.bucket,
         Key: key,
       });
 
       await this.s3Client.send(command);
       this.logger.log(`File deleted: ${key}`);
-    } catch (error) {
+    } catch (error: any) {
       this.logger.error(`Failed to delete ${key}: ${error.message}`);
       throw new Error(`S3 delete failed: ${error.message}`);
     }
@@ -128,8 +171,10 @@ export class S3Service {
    * Get public URL for a key
    */
   getPublicUrl(key: string): string {
-    const publicUrl = process.env.S3_PUBLIC_URL || process.env.S3_ENDPOINT;
-    return `${publicUrl}/${this.bucket}/${key}`;
+    if (this.config.publicUrl) {
+      return `${this.config.publicUrl}/${key}`;
+    }
+    return `${this.config.endpoint}/${this.config.bucket}/${key}`;
   }
 
   /**

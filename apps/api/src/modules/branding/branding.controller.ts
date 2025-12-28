@@ -1,38 +1,45 @@
 import {
   Controller,
   Post,
+  Get,
   Body,
+  Param,
   HttpCode,
   HttpStatus,
   Logger,
+  NotFoundException,
 } from '@nestjs/common';
 import { BrandingService } from './branding.service';
 import {
   ExtractBrandingDto,
   PreviewBrandingDto,
 } from './dto/extract-branding.dto';
-import { BrandingResult } from './interfaces/branding.interface';
+import { BrandingResult, BrandingSettings } from './interfaces/branding.interface';
+import { OpenRouterService } from './services/openrouter.service';
 
 @Controller('branding')
 export class BrandingController {
   private readonly logger = new Logger(BrandingController.name);
 
-  constructor(private readonly brandingService: BrandingService) {}
+  constructor(
+    private readonly brandingService: BrandingService,
+    private readonly openRouterService: OpenRouterService,
+  ) {}
 
   /**
-   * Extract branding from website (for onboarding)
+   * Extract and SAVE branding to tenant
    * POST /api/branding/extract
    */
   @Post('extract')
   @HttpCode(HttpStatus.OK)
   async extractBranding(
-    @Body() dto: ExtractBrandingDto
+    @Body() dto: ExtractBrandingDto,
   ): Promise<BrandingResult> {
-    this.logger.log(`Extracting branding for tenant: ${dto.tenantSlug}`);
+    this.logger.log(`Extracting and saving branding for tenant: ${dto.tenantSlug}`);
 
-    return this.brandingService.extractBrandingFromWebsite(
+    return this.brandingService.extractAndSaveBranding(
       dto.websiteUrl,
-      dto.tenantSlug
+      dto.tenantSlug,
     );
   }
 
@@ -43,14 +50,33 @@ export class BrandingController {
   @Post('preview')
   @HttpCode(HttpStatus.OK)
   async previewBranding(
-    @Body() dto: PreviewBrandingDto
+    @Body() dto: PreviewBrandingDto,
   ): Promise<BrandingResult> {
     this.logger.log(`Previewing branding for URL: ${dto.websiteUrl}`);
 
     return this.brandingService.extractBrandingFromWebsite(
       dto.websiteUrl,
-      'preview'
+      'preview',
     );
+  }
+
+  /**
+   * Get tenant branding
+   * GET /api/branding/:tenantSlug
+   */
+  @Get(':tenantSlug')
+  async getTenantBranding(
+    @Param('tenantSlug') tenantSlug: string,
+  ): Promise<BrandingSettings> {
+    this.logger.log(`Getting branding for tenant: ${tenantSlug}`);
+
+    const branding = await this.brandingService.getTenantBranding(tenantSlug);
+
+    if (!branding) {
+      throw new NotFoundException(`Branding not found for tenant: ${tenantSlug}`);
+    }
+
+    return branding;
   }
 
   /**
@@ -60,8 +86,17 @@ export class BrandingController {
   @Post('colors/shades')
   @HttpCode(HttpStatus.OK)
   async generateColorShades(
-    @Body() dto: { color: string }
+    @Body() dto: { color: string },
   ): Promise<Record<string, string>> {
     return this.brandingService.generateColorShades(dto.color);
+  }
+
+  /**
+   * Health check for OpenRouter models
+   * GET /api/branding/health
+   */
+  @Get('health')
+  async healthCheck() {
+    return this.openRouterService.healthCheck();
   }
 }

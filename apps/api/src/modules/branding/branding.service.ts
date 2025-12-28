@@ -1,34 +1,29 @@
 import { Injectable, Logger } from '@nestjs/common';
 import axios from 'axios';
 import * as cheerio from 'cheerio';
-import OpenAI from 'openai';
 import {
   BrandingResult,
   BrandColors,
   ExtractedCompanyData,
+  BrandingSettings,
 } from './interfaces/branding.interface';
 import {
   EXTRACT_COMPANY_DATA_PROMPT,
   EXTRACT_COLORS_PROMPT,
-  OPENROUTER_MODELS,
 } from './prompts';
 import { S3Service } from '../storage/s3.service';
+import { OpenRouterService } from './services/openrouter.service';
+import { PrismaService } from '../database/prisma.service';
 
 @Injectable()
 export class BrandingService {
   private readonly logger = new Logger(BrandingService.name);
-  private readonly openrouter: OpenAI;
 
-  constructor(private readonly s3Service: S3Service) {
-    this.openrouter = new OpenAI({
-      baseURL: process.env.OPENROUTER_BASE_URL || 'https://openrouter.ai/api/v1',
-      apiKey: process.env.OPENROUTER_API_KEY,
-      defaultHeaders: {
-        'HTTP-Referer': process.env.FRONTEND_URL || 'https://dockpulse.com',
-        'X-Title': 'DockPulse',
-      },
-    });
-  }
+  constructor(
+    private readonly s3Service: S3Service,
+    private readonly openRouterService: OpenRouterService,
+    private readonly prisma: PrismaService,
+  ) {}
 
   /**
    * Extract branding information from a website URL
@@ -140,8 +135,7 @@ export class BrandingService {
     const truncatedHtml = html.slice(0, 8000);
 
     try {
-      const response = await this.openrouter.chat.completions.create({
-        model: OPENROUTER_MODELS.text.primary,
+      const content = await this.openRouterService.textCompletion({
         messages: [
           {
             role: 'user',
@@ -151,15 +145,10 @@ export class BrandingService {
               .replace('{{BASE_URL}}', baseUrl),
           },
         ],
-        response_format: { type: 'json_object' },
+        responseFormat: { type: 'json_object' },
         temperature: 0.1,
-        max_tokens: 1000,
+        maxTokens: 1000,
       });
-
-      const content = response.choices[0]?.message?.content;
-      if (!content) {
-        throw new Error('Empty LLM response');
-      }
 
       const result = JSON.parse(content) as ExtractedCompanyData;
 
@@ -203,8 +192,7 @@ export class BrandingService {
       // Convert logo to base64
       const logoBase64 = await this.imageToBase64(logoUrl);
 
-      const response = await this.openrouter.chat.completions.create({
-        model: OPENROUTER_MODELS.vision.primary,
+      const content = await this.openRouterService.visionCompletion({
         messages: [
           {
             role: 'user',
@@ -216,16 +204,11 @@ export class BrandingService {
               },
             ],
           },
-        ],
-        response_format: { type: 'json_object' },
+        ] as any,
+        responseFormat: { type: 'json_object' },
         temperature: 0.1,
-        max_tokens: 200,
+        maxTokens: 200,
       });
-
-      const content = response.choices[0]?.message?.content;
-      if (!content) {
-        throw new Error('Empty Vision API response');
-      }
 
       const colors = JSON.parse(content);
 
@@ -361,17 +344,19 @@ export class BrandingService {
       // Upload logo
       if (logoUrl && !logoUrl.startsWith('/assets/')) {
         const logoKey = this.s3Service.generateAssetKey(tenantSlug, 'logo', 'logo.png');
-        result.logoUrl = await this.s3Service.uploadFromUrl(logoKey, logoUrl, 'image/png');
+        const uploadResult = await this.s3Service.uploadFromUrl(logoKey, logoUrl, 'image/png');
+        result.logoUrl = uploadResult.url;
         this.logger.log(`Logo uploaded to S3: ${result.logoUrl}`);
       }
 
       // Upload favicon
       if (faviconUrl && !faviconUrl.startsWith('/')) {
         const faviconKey = this.s3Service.generateAssetKey(tenantSlug, 'favicon', 'favicon.ico');
-        result.faviconUrl = await this.s3Service.uploadFromUrl(faviconKey, faviconUrl);
+        const uploadResult = await this.s3Service.uploadFromUrl(faviconKey, faviconUrl);
+        result.faviconUrl = uploadResult.url;
         this.logger.log(`Favicon uploaded to S3: ${result.faviconUrl}`);
       }
-    } catch (error) {
+    } catch (error: any) {
       this.logger.error(`Failed to upload assets: ${error.message}`);
       // Return original URLs on failure
     }
@@ -380,9 +365,58 @@ export class BrandingService {
   }
 
   /**
-   * Extract and persist branding for a tenant
+   * Save branding to tenant in platform database
    */
-  async extractAndPersistBranding(
+  async saveBrandingToTenant(
+    tenantSlug: string,
+    branding: BrandingResult,
+  ): Promise<void> {
+    this.logger.log(`Saving branding for tenant: ${tenantSlug}`);
+
+    const brandingSettings: BrandingSettings = {
+      logoUrl: branding.branding.logoUrl,
+      faviconUrl: branding.branding.faviconUrl,
+      companyName: branding.companyData.name,
+      colors: branding.branding.colors,
+      companyData: {
+        nip: branding.companyData.nip,
+        address: branding.companyData.address,
+        phone: branding.companyData.phone,
+        email: branding.companyData.email,
+      },
+    };
+
+    await this.prisma.tenant.update({
+      where: { slug: tenantSlug },
+      data: {
+        branding: brandingSettings as any, // Prisma JSONB
+        updatedAt: new Date(),
+      },
+    });
+
+    this.logger.log(`Branding saved for tenant: ${tenantSlug}`);
+  }
+
+  /**
+   * Get branding from tenant
+   */
+  async getTenantBranding(tenantSlug: string): Promise<BrandingSettings | null> {
+    const tenant = await this.prisma.tenant.findUnique({
+      where: { slug: tenantSlug },
+      select: { branding: true },
+    });
+
+    if (!tenant?.branding || Object.keys(tenant.branding as object).length === 0) {
+      return null;
+    }
+
+    return tenant.branding as BrandingSettings;
+  }
+
+  /**
+   * Extract and save branding (full flow)
+   */
+  async extractAndSaveBranding(
     websiteUrl: string,
     tenantSlug: string,
   ): Promise<BrandingResult> {
@@ -396,13 +430,30 @@ export class BrandingService {
       branding.branding.faviconUrl,
     );
 
-    // 3. Return with new URLs
-    return {
+    // 3. Merge with uploaded URLs
+    const result: BrandingResult = {
       ...branding,
       branding: {
         ...branding.branding,
         ...uploadedAssets,
       },
     };
+
+    // 4. Save to database (skip for preview)
+    if (tenantSlug !== 'preview') {
+      await this.saveBrandingToTenant(tenantSlug, result);
+    }
+
+    return result;
+  }
+
+  /**
+   * Extract branding without saving (for preview)
+   */
+  async extractAndPersistBranding(
+    websiteUrl: string,
+    tenantSlug: string,
+  ): Promise<BrandingResult> {
+    return this.extractAndSaveBranding(websiteUrl, tenantSlug);
   }
 }

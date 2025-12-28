@@ -1,0 +1,20 @@
+{
+  "companyDataResponse": {
+    "companyName": "Test Company Sp. z o.o.",
+    "nip": "123-456-78-90",
+    "address": {
+      "street": "ul. Testowa 15",
+      "city": "Warszawa",
+      "postalCode": "00-001"
+    },
+    "phone": "+48 123 456 789",
+    "email": "kontakt@testcompany.pl",
+    "logoUrl": "/images/logo.png",
+    "faviconUrl": "/favicon.ico"
+  },
+  "colorsResponse": {
+    "primary": "#2B579A",
+    "secondary": "#4472C4",
+    "accent": "#70AD47"
+  }
+}
