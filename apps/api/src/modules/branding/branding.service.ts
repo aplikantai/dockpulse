@@ -12,13 +12,14 @@ import {
   EXTRACT_COLORS_PROMPT,
   OPENROUTER_MODELS,
 } from './prompts';
+import { S3Service } from '../storage/s3.service';
 
 @Injectable()
 export class BrandingService {
   private readonly logger = new Logger(BrandingService.name);
   private readonly openrouter: OpenAI;
 
-  constructor() {
+  constructor(private readonly s3Service: S3Service) {
     this.openrouter = new OpenAI({
       baseURL: process.env.OPENROUTER_BASE_URL || 'https://openrouter.ai/api/v1',
       apiKey: process.env.OPENROUTER_API_KEY,
@@ -342,5 +343,66 @@ export class BrandingService {
 
   private rgbToHex(r: number, g: number, b: number): string {
     return '#' + [r, g, b].map((x) => x.toString(16).padStart(2, '0')).join('');
+  }
+
+  /**
+   * Upload branding assets to S3 and return new URLs
+   */
+  async uploadBrandingAssets(
+    tenantSlug: string,
+    logoUrl: string,
+    faviconUrl?: string,
+  ): Promise<{ logoUrl: string; faviconUrl?: string }> {
+    const result: { logoUrl: string; faviconUrl?: string } = {
+      logoUrl: logoUrl,
+    };
+
+    try {
+      // Upload logo
+      if (logoUrl && !logoUrl.startsWith('/assets/')) {
+        const logoKey = this.s3Service.generateAssetKey(tenantSlug, 'logo', 'logo.png');
+        result.logoUrl = await this.s3Service.uploadFromUrl(logoKey, logoUrl, 'image/png');
+        this.logger.log(`Logo uploaded to S3: ${result.logoUrl}`);
+      }
+
+      // Upload favicon
+      if (faviconUrl && !faviconUrl.startsWith('/')) {
+        const faviconKey = this.s3Service.generateAssetKey(tenantSlug, 'favicon', 'favicon.ico');
+        result.faviconUrl = await this.s3Service.uploadFromUrl(faviconKey, faviconUrl);
+        this.logger.log(`Favicon uploaded to S3: ${result.faviconUrl}`);
+      }
+    } catch (error) {
+      this.logger.error(`Failed to upload assets: ${error.message}`);
+      // Return original URLs on failure
+    }
+
+    return result;
+  }
+
+  /**
+   * Extract and persist branding for a tenant
+   */
+  async extractAndPersistBranding(
+    websiteUrl: string,
+    tenantSlug: string,
+  ): Promise<BrandingResult> {
+    // 1. Extract branding data
+    const branding = await this.extractBrandingFromWebsite(websiteUrl, tenantSlug);
+
+    // 2. Upload assets to S3
+    const uploadedAssets = await this.uploadBrandingAssets(
+      tenantSlug,
+      branding.branding.logoUrl,
+      branding.branding.faviconUrl,
+    );
+
+    // 3. Return with new URLs
+    return {
+      ...branding,
+      branding: {
+        ...branding.branding,
+        ...uploadedAssets,
+      },
+    };
   }
 }

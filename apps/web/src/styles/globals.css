@@ -1,0 +1,145 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ============================================
+   CSS Variables - Auto-Branding Support
+   ============================================ */
+:root {
+  /* Default brand colors (DockPulse) */
+  --color-primary: #2B579A;
+  --color-primary-50: #EBF0F7;
+  --color-primary-100: #D6E1EF;
+  --color-primary-200: #AEC3DF;
+  --color-primary-300: #85A5CF;
+  --color-primary-400: #5D87BF;
+  --color-primary-500: #2B579A;
+  --color-primary-600: #234A82;
+  --color-primary-700: #1A3C6A;
+  --color-primary-800: #122D52;
+  --color-primary-900: #0F1F35;
+
+  --color-secondary: #4472C4;
+  --color-accent: #70AD47;
+
+  /* System colors */
+  --background: #F5F5F7;
+  --surface: rgba(255, 255, 255, 0.7);
+  --border: rgba(255, 255, 255, 0.2);
+
+  /* Text colors */
+  --text-primary: #1d1d1f;
+  --text-secondary: #6e6e73;
+  --text-tertiary: #86868b;
+}
+
+/* Dark mode (optional) */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #1d1d1f;
+    --surface: rgba(30, 30, 32, 0.8);
+    --border: rgba(255, 255, 255, 0.1);
+    --text-primary: #f5f5f7;
+    --text-secondary: #a1a1a6;
+    --text-tertiary: #6e6e73;
+  }
+}
+
+/* ============================================
+   Base Styles
+   ============================================ */
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+  background: var(--background);
+  color: var(--text-primary);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ============================================
+   Glassmorphism Components
+   ============================================ */
+@layer components {
+  .glass-card {
+    @apply backdrop-blur-xl bg-white/70 rounded-2xl border border-white/20 shadow-glass;
+  }
+
+  .glass-card-hover {
+    @apply glass-card transition-all duration-200;
+    @apply hover:shadow-glass-hover hover:bg-white/80;
+  }
+
+  .glass-surface {
+    @apply backdrop-blur-lg bg-white/80 border-b border-white/20;
+  }
+
+  .glass-input {
+    @apply w-full px-4 py-3 rounded-xl border border-gray-200;
+    @apply bg-white/50 backdrop-blur-sm;
+    @apply focus:border-primary focus:ring-2 focus:ring-primary/20;
+    @apply transition-all duration-200 outline-none;
+  }
+
+  .glass-button {
+    @apply px-6 py-3 rounded-xl font-medium;
+    @apply bg-primary text-white;
+    @apply hover:bg-primary-600 active:bg-primary-700;
+    @apply transition-all duration-200;
+    @apply disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+
+  .glass-button-secondary {
+    @apply px-6 py-3 rounded-xl font-medium;
+    @apply bg-white/50 backdrop-blur-sm border border-gray-200;
+    @apply text-gray-700 hover:bg-gray-50;
+    @apply transition-all duration-200;
+  }
+}
+
+/* ============================================
+   Animations
+   ============================================ */
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    rgba(0, 0, 0, 0.06) 25%,
+    rgba(0, 0, 0, 0.10) 50%,
+    rgba(0, 0, 0, 0.06) 75%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+}
+
+/* ============================================
+   Scrollbar
+   ============================================ */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.3);
+}

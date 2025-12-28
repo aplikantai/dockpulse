@@ -37,6 +37,7 @@ interface ThemeContextValue {
   favicon: string;
   companyName: string;
   isLoaded: boolean;
+  branding: BrandingSettings | null;
   updateBranding: (branding: Partial<BrandingSettings>) => void;
 }
 
@@ -53,6 +54,7 @@ const DEFAULT_THEME: ThemeContextValue = {
   favicon: '/favicon.ico',
   companyName: 'DockPulse',
   isLoaded: false,
+  branding: null,
   updateBranding: () => {},
 };
 
@@ -114,6 +116,7 @@ export function ThemeProvider({ children, initialBranding }: ThemeProviderProps)
     favicon: branding?.faviconUrl || DEFAULT_THEME.favicon,
     companyName: branding?.companyName || DEFAULT_THEME.companyName,
     isLoaded,
+    branding,
     updateBranding,
   };
 
