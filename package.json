@@ -1,0 +1,50 @@
+{
+  "name": "dockpulse",
+  "version": "2.0.0",
+  "private": true,
+  "description": "Modularna platforma CRM/WMS typu multi-tenant",
+  "author": "Bartosz Gaca <kontakt@bartoszgaca.pl>",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/gacabartosz/dockpulse.git"
+  },
+  "scripts": {
+    "dev": "turbo run dev",
+    "build": "turbo run build",
+    "start": "turbo run start",
+    "lint": "turbo run lint",
+    "test": "turbo run test",
+    "test:e2e": "turbo run test:e2e",
+    "clean": "turbo run clean && rm -rf node_modules",
+    "db:migrate": "pnpm --filter @dockpulse/database prisma migrate dev",
+    "db:migrate:deploy": "pnpm --filter @dockpulse/database prisma migrate deploy",
+    "db:seed": "pnpm --filter @dockpulse/database prisma db seed",
+    "db:studio": "pnpm --filter @dockpulse/database prisma studio",
+    "db:generate": "pnpm --filter @dockpulse/database prisma generate",
+    "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md}\"",
+    "prepare": "husky install"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "husky": "^8.0.3",
+    "lint-staged": "^15.2.0",
+    "prettier": "^3.1.0",
+    "turbo": "^1.11.0",
+    "typescript": "^5.3.0"
+  },
+  "packageManager": "pnpm@8.12.0",
+  "engines": {
+    "node": ">=20.0.0",
+    "pnpm": ">=8.0.0"
+  },
+  "lint-staged": {
+    "*.{ts,tsx,js,jsx}": [
+      "prettier --write",
+      "eslint --fix"
+    ],
+    "*.{json,md}": [
+      "prettier --write"
+    ]
+  }
+}
