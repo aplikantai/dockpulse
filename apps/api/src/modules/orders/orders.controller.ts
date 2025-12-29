@@ -56,9 +56,32 @@ export class OrdersController {
     return this.ordersService.create(tenant.id, user.userId, dto);
   }
 
+  @Get('statuses')
+  @ApiOperation({ summary: 'Get valid statuses for tenant template' })
+  @ApiResponse({
+    status: 200,
+    description: 'List of valid statuses',
+    schema: {
+      example: [
+        { code: 'new', name: 'Nowe', color: '#3B82F6' },
+        { code: 'confirmed', name: 'Potwierdzone', color: '#8B5CF6' },
+      ],
+    },
+  })
+  async getStatuses(@Tenant() tenant: TenantContext) {
+    return this.ordersService.getValidStatuses(tenant.id);
+  }
+
+  @Get('naming')
+  @ApiOperation({ summary: 'Get entity naming for tenant template' })
+  @ApiResponse({ status: 200, description: 'Entity naming configuration' })
+  async getNaming(@Tenant() tenant: TenantContext) {
+    return this.ordersService.getEntityNaming(tenant.id);
+  }
+
   @Get()
   @ApiOperation({ summary: 'Get all orders for tenant' })
-  @ApiQuery({ name: 'status', required: false, enum: OrderStatus })
+  @ApiQuery({ name: 'status', required: false })
   @ApiQuery({ name: 'customerId', required: false })
   @ApiQuery({ name: 'search', required: false })
   @ApiQuery({ name: 'page', required: false, type: Number })
@@ -97,13 +120,15 @@ export class OrdersController {
   @Patch(':id/status')
   @ApiOperation({ summary: 'Update order status' })
   @ApiResponse({ status: 200, description: 'Status updated', type: OrderResponseDto })
+  @ApiResponse({ status: 400, description: 'Invalid status for template' })
   @ApiResponse({ status: 404, description: 'Order not found' })
   async updateStatus(
     @Tenant() tenant: TenantContext,
+    @CurrentUser() user: CurrentUserData,
     @Param('id') id: string,
     @Body() dto: UpdateOrderStatusDto,
   ): Promise<OrderResponseDto> {
-    return this.ordersService.updateStatus(tenant.id, id, dto);
+    return this.ordersService.updateStatus(tenant.id, id, dto, user.userId);
   }
 
   @Delete(':id')

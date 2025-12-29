@@ -58,3 +58,48 @@ export class JwtPayload {
   role: string;
   tenantId: string;
 }
+
+// ============================================
+// REFRESH TOKEN
+// ============================================
+
+export class RefreshTokenDto {
+  @ApiProperty({ description: 'Refresh token' })
+  @IsString()
+  refreshToken: string;
+}
+
+export class AuthResponseWithRefresh extends AuthResponse {
+  @ApiProperty()
+  refreshToken: string;
+}
+
+// ============================================
+// CHANGE PASSWORD
+// ============================================
+
+export class ChangePasswordDto {
+  @ApiProperty({ example: 'oldPassword123', minLength: 6 })
+  @IsString()
+  @MinLength(6)
+  currentPassword: string;
+
+  @ApiProperty({ example: 'newPassword456', minLength: 8 })
+  @IsString()
+  @MinLength(8)
+  newPassword: string;
+}
+
+export class ChangePasswordResponse {
+  @ApiProperty({ example: 'Password changed successfully' })
+  message: string;
+}
+
+// ============================================
+// LOGOUT
+// ============================================
+
+export class LogoutResponse {
+  @ApiProperty({ example: 'Logged out successfully' })
+  message: string;
+}

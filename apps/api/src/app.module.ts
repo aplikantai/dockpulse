@@ -7,12 +7,16 @@ import { StorageModule } from './modules/storage/storage.module';
 import { BrandingModule } from './modules/branding/branding.module';
 import { CacheModule } from './modules/cache/cache.module';
 import { AuthModule } from './modules/auth/auth.module';
+import { JwtAuthGuard } from './modules/auth/guards/jwt-auth.guard';
+import { RolesGuard } from './modules/auth/guards/roles.guard';
 import { TenantModule } from './modules/tenant/tenant.module';
 import { UsersModule } from './modules/users/users.module';
 import { CustomersModule } from './modules/customers/customers.module';
 import { OrdersModule } from './modules/orders/orders.module';
 import { QuotesModule } from './modules/quotes/quotes.module';
 import { ProductsModule } from './modules/products/products.module';
+import { SettingsModule } from './modules/settings/settings.module';
+import { HealthController } from './health.controller';
 
 @Module({
   imports: [
@@ -44,13 +48,24 @@ import { ProductsModule } from './modules/products/products.module';
     OrdersModule,
     QuotesModule,
     ProductsModule,
+    SettingsModule,
   ],
-  controllers: [],
+  controllers: [HealthController],
   providers: [
     // Apply throttler guard globally
     {
       provide: APP_GUARD,
       useClass: ThrottlerGuard,
+    },
+    // Apply JWT auth guard globally (use @Public() for open endpoints)
+    {
+      provide: APP_GUARD,
+      useClass: JwtAuthGuard,
+    },
+    // Apply roles guard globally (use @Roles() to restrict access)
+    {
+      provide: APP_GUARD,
+      useClass: RolesGuard,
     },
   ],
 })

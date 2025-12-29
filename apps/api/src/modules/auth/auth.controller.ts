@@ -14,7 +14,15 @@ import {
   ApiHeader,
 } from '@nestjs/swagger';
 import { AuthService } from './auth.service';
-import { LoginDto, RegisterDto, AuthResponse } from './dto/auth.dto';
+import {
+  LoginDto,
+  RegisterDto,
+  AuthResponseWithRefresh,
+  RefreshTokenDto,
+  ChangePasswordDto,
+  ChangePasswordResponse,
+  LogoutResponse,
+} from './dto/auth.dto';
 import { Public } from './decorators/public.decorator';
 import { CurrentUser, CurrentUserData } from './decorators/current-user.decorator';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
@@ -28,12 +36,12 @@ export class AuthController {
   @Post('login')
   @ApiOperation({ summary: 'Login user' })
   @ApiHeader({ name: 'x-tenant-id', required: true, description: 'Tenant slug' })
-  @ApiResponse({ status: 200, description: 'Login successful', type: AuthResponse })
+  @ApiResponse({ status: 200, description: 'Login successful', type: AuthResponseWithRefresh })
   @ApiResponse({ status: 401, description: 'Invalid credentials' })
   async login(
     @Body() dto: LoginDto,
     @Headers('x-tenant-id') tenantId: string,
-  ): Promise<AuthResponse> {
+  ): Promise<AuthResponseWithRefresh> {
     return this.authService.login(dto, tenantId);
   }
 
@@ -41,13 +49,22 @@ export class AuthController {
   @Post('register')
   @ApiOperation({ summary: 'Register new user' })
   @ApiHeader({ name: 'x-tenant-id', required: true, description: 'Tenant slug' })
-  @ApiResponse({ status: 201, description: 'User created', type: AuthResponse })
+  @ApiResponse({ status: 201, description: 'User created', type: AuthResponseWithRefresh })
   @ApiResponse({ status: 409, description: 'User already exists' })
   async register(
     @Body() dto: RegisterDto,
     @Headers('x-tenant-id') tenantId: string,
-  ): Promise<AuthResponse> {
+  ): Promise<AuthResponseWithRefresh> {
     return this.authService.register(dto, tenantId);
+  }
+
+  @Public()
+  @Post('refresh')
+  @ApiOperation({ summary: 'Refresh access token' })
+  @ApiResponse({ status: 200, description: 'Tokens refreshed' })
+  @ApiResponse({ status: 401, description: 'Invalid refresh token' })
+  async refresh(@Body() dto: RefreshTokenDto) {
+    return this.authService.refreshToken(dto.refreshToken);
   }
 
   @Get('me')
@@ -58,5 +75,31 @@ export class AuthController {
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   async me(@CurrentUser() user: CurrentUserData) {
     return this.authService.getUserById(user.userId);
+  }
+
+  @Post('change-password')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Change password' })
+  @ApiResponse({ status: 200, description: 'Password changed', type: ChangePasswordResponse })
+  @ApiResponse({ status: 401, description: 'Current password incorrect' })
+  async changePassword(
+    @CurrentUser() user: CurrentUserData,
+    @Body() dto: ChangePasswordDto,
+  ): Promise<ChangePasswordResponse> {
+    return this.authService.changePassword(
+      user.userId,
+      dto.currentPassword,
+      dto.newPassword,
+    );
+  }
+
+  @Post('logout')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Logout user' })
+  @ApiResponse({ status: 200, description: 'Logged out', type: LogoutResponse })
+  async logout(@CurrentUser() user: CurrentUserData): Promise<LogoutResponse> {
+    return this.authService.logout(user.userId);
   }
 }

@@ -15,6 +15,9 @@ import {
 } from './dto/order.dto';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { Cache } from 'cache-manager';
+import { ORDER_STATUSES, ENTITY_NAMING, EVENT_TYPES } from '../../common/constants';
+
+type TemplateType = 'services' | 'production' | 'trade';
 
 @Injectable()
 export class OrdersService {
@@ -22,6 +25,53 @@ export class OrdersService {
     private readonly prisma: PrismaService,
     @Inject(CACHE_MANAGER) private cacheManager: Cache,
   ) {}
+
+  // ===========================================
+  // TEMPLATE-AWARE HELPERS
+  // ===========================================
+
+  private async getTenantTemplate(tenantId: string): Promise<TemplateType> {
+    const tenant = await (this.prisma as any).tenant.findUnique({
+      where: { id: tenantId },
+      select: { template: true },
+    });
+    return (tenant?.template as TemplateType) || 'services';
+  }
+
+  async getValidStatuses(tenantId: string) {
+    const template = await this.getTenantTemplate(tenantId);
+    return ORDER_STATUSES[template];
+  }
+
+  async getEntityNaming(tenantId: string) {
+    const template = await this.getTenantTemplate(tenantId);
+    return ENTITY_NAMING[template];
+  }
+
+  private async validateStatus(tenantId: string, status: string): Promise<boolean> {
+    const validStatuses = await this.getValidStatuses(tenantId);
+    return validStatuses.some((s) => s.code === status);
+  }
+
+  private async logEvent(
+    tenantId: string,
+    eventType: string,
+    entityType: string,
+    entityId: string,
+    userId: string | null,
+    payload: object,
+  ): Promise<void> {
+    await (this.prisma as any).eventLog.create({
+      data: {
+        tenantId,
+        eventType,
+        entityType,
+        entityId,
+        userId,
+        payload,
+      },
+    });
+  }
 
   private async generateOrderNumber(tenantId: string): Promise<string> {
     const year = new Date().getFullYear();
@@ -93,7 +143,7 @@ export class OrdersService {
         orderNumber,
         customerId: dto.customerId,
         userId,
-        status: dto.status || OrderStatus.NEW,
+        status: dto.status || 'new', // Use 'new' as default (first status in all templates)
         totalNet,
         totalGross,
         vatRate,
@@ -106,6 +156,16 @@ export class OrdersService {
         items: true,
       },
     });
+
+    // Log order created event
+    await this.logEvent(
+      tenantId,
+      EVENT_TYPES.ORDER_CREATED,
+      'order',
+      order.id,
+      userId,
+      { orderNumber, customerId: dto.customerId, totalGross },
+    );
 
     return this.mapToResponse(order);
   }
@@ -254,6 +314,7 @@ export class OrdersService {
     tenantId: string,
     orderId: string,
     dto: UpdateOrderStatusDto,
+    userId?: string,
   ): Promise<OrderResponseDto> {
     const order = await (this.prisma as any).order.findFirst({
       where: { id: orderId, tenantId },
@@ -263,11 +324,32 @@ export class OrdersService {
       throw new NotFoundException('Order not found');
     }
 
+    // Validate status is valid for tenant's template
+    const isValid = await this.validateStatus(tenantId, dto.status);
+    if (!isValid) {
+      const validStatuses = await this.getValidStatuses(tenantId);
+      throw new BadRequestException(
+        `Invalid status. Valid statuses: ${validStatuses.map((s) => s.code).join(', ')}`,
+      );
+    }
+
+    const previousStatus = order.status;
+
     const updated = await (this.prisma as any).order.update({
       where: { id: orderId },
       data: { status: dto.status },
       include: { items: true },
     });
+
+    // Log status change event
+    await this.logEvent(
+      tenantId,
+      EVENT_TYPES.ORDER_STATUS_CHANGED,
+      'order',
+      orderId,
+      userId || null,
+      { previousStatus, newStatus: dto.status, orderNumber: order.orderNumber },
+    );
 
     await this.cacheManager.del(`order:${orderId}`);
     return this.mapToResponse(updated);

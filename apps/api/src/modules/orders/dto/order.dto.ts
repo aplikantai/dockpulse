@@ -11,14 +11,29 @@ import {
 import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional, PartialType } from '@nestjs/swagger';
 
+// Note: Actual valid statuses depend on tenant's template
+// Use GET /orders/statuses to get valid statuses for the tenant
 export enum OrderStatus {
+  // Common statuses (present in all templates)
   NEW = 'new',
-  CONFIRMED = 'confirmed',
+  CANCELLED = 'cancelled',
+  // services template
+  QUOTED = 'quoted',
+  ACCEPTED = 'accepted',
   IN_PROGRESS = 'in_progress',
+  REVIEW = 'review',
+  COMPLETED = 'completed',
+  // production template
+  CONFIRMED = 'confirmed',
+  IN_PRODUCTION = 'in_production',
+  QUALITY_CHECK = 'quality_check',
   READY = 'ready',
   SHIPPED = 'shipped',
   DELIVERED = 'delivered',
-  CANCELLED = 'cancelled',
+  // trade template
+  PICKING = 'picking',
+  PACKED = 'packed',
+  RETURNED = 'returned',
 }
 
 export class OrderItemDto {
@@ -67,9 +82,12 @@ export class CreateOrderDto {
 export class UpdateOrderDto extends PartialType(CreateOrderDto) {}
 
 export class UpdateOrderStatusDto {
-  @ApiProperty({ enum: OrderStatus })
-  @IsEnum(OrderStatus)
-  status: OrderStatus;
+  @ApiProperty({
+    description: 'New status (must be valid for tenant template - use GET /orders/statuses)',
+    example: 'confirmed',
+  })
+  @IsString()
+  status: string;
 }
 
 export class OrderItemResponseDto {

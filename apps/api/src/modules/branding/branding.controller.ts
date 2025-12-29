@@ -25,6 +25,7 @@ import {
 } from './dto/extract-branding.dto';
 import { BrandingResult, BrandingSettings } from './interfaces/branding.interface';
 import { OpenRouterService } from './services/openrouter.service';
+import { Public } from '../auth/decorators/public.decorator';
 
 @ApiTags('branding')
 @Controller('branding')
@@ -121,6 +122,7 @@ export class BrandingController {
    * GET /api/branding/health
    * IMPORTANT: Must be BEFORE :tenantSlug to avoid route collision
    */
+  @Public()
   @Get('health')
   @SkipThrottle()
   @ApiOperation({
@@ -147,6 +149,7 @@ export class BrandingController {
    * GET /api/branding/:tenantSlug
    * NOTE: Wildcard route - must be LAST among GET routes
    */
+  @Public()
   @Get(':tenantSlug')
   @ApiOperation({
     summary: 'Get tenant branding',

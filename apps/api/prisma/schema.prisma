@@ -14,18 +14,113 @@ model Tenant {
   id        String   @id @default(uuid())
   slug      String   @unique
   name      String
+  template  String   @default("services") // 'services' | 'production' | 'trade'
   branding  Json?
   settings  Json?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  users     User[]
-  customers Customer[]
-  orders    Order[]
-  quotes    Quote[]
-  products  Product[]
+  users           User[]
+  customers       Customer[]
+  orders          Order[]
+  quotes          Quote[]
+  products        Product[]
+  modules         TenantModule[]
+  fieldConfigs    FieldConfig[]
+  triggers        WorkflowTrigger[]
+  eventLogs       EventLog[]
 
   @@map("tenants")
+}
+
+// ===========================================
+// MODULE CONFIGURATION (per tenant)
+// ===========================================
+
+model TenantModule {
+  id          String   @id @default(uuid())
+  tenantId    String
+  tenant      Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  moduleCode  String   // '@customers' | '@orders' | '@products' | '@quotes' | '@stock' | '@calendar' | etc.
+  isEnabled   Boolean  @default(true)
+  config      Json     @default("{}")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([tenantId, moduleCode])
+  @@index([tenantId])
+  @@map("tenant_modules")
+}
+
+// ===========================================
+// FIELD CONFIGURATION (per tenant, per entity)
+// ===========================================
+
+model FieldConfig {
+  id           String   @id @default(uuid())
+  tenantId     String
+  tenant       Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  entityType   String   // 'customer' | 'order' | 'product' | 'quote'
+  fieldName    String   // e.g., 'phone', 'nip', 'deliveryAddress'
+  isVisible    Boolean  @default(true)
+  isRequired   Boolean  @default(false)
+  displayOrder Int      @default(0)
+  label        String?  // Custom label override
+  config       Json     @default("{}")
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@unique([tenantId, entityType, fieldName])
+  @@index([tenantId])
+  @@index([entityType])
+  @@map("field_configs")
+}
+
+// ===========================================
+// WORKFLOW TRIGGERS (per tenant)
+// ===========================================
+
+model WorkflowTrigger {
+  id          String   @id @default(uuid())
+  tenantId    String
+  tenant      Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  code        String   // e.g., 'order.new.sms_admin'
+  name        String   // Human-readable name
+  eventType   String   // 'order.created' | 'order.status_changed' | 'customer.created' | etc.
+  actionType  String   // 'sms' | 'email' | 'webhook' | 'create_entity'
+  actionConfig Json    @default("{}") // Template, recipient config, etc.
+  conditions  Json     @default("{}") // When to trigger (status = 'ready', etc.)
+  isEnabled   Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([tenantId, code])
+  @@index([tenantId])
+  @@index([eventType])
+  @@index([isEnabled])
+  @@map("workflow_triggers")
+}
+
+// ===========================================
+// EVENT LOG (audit trail per tenant)
+// ===========================================
+
+model EventLog {
+  id          String   @id @default(uuid())
+  tenantId    String
+  tenant      Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  eventType   String   // 'order.created', 'order.status_changed', etc.
+  entityType  String   // 'order', 'customer', 'product', 'quote'
+  entityId    String
+  userId      String?
+  payload     Json     @default("{}")
+  createdAt   DateTime @default(now())
+
+  @@index([tenantId])
+  @@index([eventType])
+  @@index([entityType, entityId])
+  @@index([createdAt])
+  @@map("event_logs")
 }
 
 model User {
