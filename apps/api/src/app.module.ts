@@ -6,6 +6,13 @@ import { PrismaModule } from './modules/database/prisma.module';
 import { StorageModule } from './modules/storage/storage.module';
 import { BrandingModule } from './modules/branding/branding.module';
 import { CacheModule } from './modules/cache/cache.module';
+import { AuthModule } from './modules/auth/auth.module';
+import { TenantModule } from './modules/tenant/tenant.module';
+import { UsersModule } from './modules/users/users.module';
+import { CustomersModule } from './modules/customers/customers.module';
+import { OrdersModule } from './modules/orders/orders.module';
+import { QuotesModule } from './modules/quotes/quotes.module';
+import { ProductsModule } from './modules/products/products.module';
 
 @Module({
   imports: [
@@ -30,6 +37,13 @@ import { CacheModule } from './modules/cache/cache.module';
     PrismaModule,
     StorageModule,
     BrandingModule,
+    AuthModule,
+    TenantModule,
+    UsersModule,
+    CustomersModule,
+    OrdersModule,
+    QuotesModule,
+    ProductsModule,
   ],
   controllers: [],
   providers: [

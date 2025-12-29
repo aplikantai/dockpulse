@@ -13,7 +13,7 @@ interface CompletionOptions {
   maxTokens?: number;
 }
 
-interface ModelHealthStatus {
+export interface ModelHealthStatus {
   status: 'ok' | 'degraded' | 'down';
   models: Record<string, boolean>;
   lastChecked: Date;

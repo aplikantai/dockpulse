@@ -15,8 +15,15 @@ model Tenant {
   slug      String   @unique
   name      String
   branding  Json?
+  settings  Json?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  users     User[]
+  customers Customer[]
+  orders    Order[]
+  quotes    Quote[]
+  products  Product[]
 
   @@map("tenants")
 }
@@ -24,11 +31,146 @@ model Tenant {
 model User {
   id        String   @id @default(uuid())
   email     String   @unique
+  password  String
   name      String?
   tenantId  String
+  tenant    Tenant   @relation(fields: [tenantId], references: [id])
   role      String   @default("user")
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  orders    Order[]
+  quotes    Quote[]
+
+  @@index([tenantId])
   @@map("users")
+}
+
+model Customer {
+  id          String   @id @default(uuid())
+  tenantId    String
+  tenant      Tenant   @relation(fields: [tenantId], references: [id])
+  name        String
+  email       String?
+  phone       String?
+  company     String?
+  address     Json?
+  notes       String?
+  tags        String[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  orders      Order[]
+  quotes      Quote[]
+
+  @@index([tenantId])
+  @@index([email])
+  @@map("customers")
+}
+
+model Product {
+  id          String   @id @default(uuid())
+  tenantId    String
+  tenant      Tenant   @relation(fields: [tenantId], references: [id])
+  sku         String
+  name        String
+  description String?
+  price       Decimal  @db.Decimal(10, 2)
+  unit        String   @default("szt")
+  category    String?
+  stock       Int      @default(0)
+  active      Boolean  @default(true)
+  metadata    Json?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  orderItems  OrderItem[]
+  quoteItems  QuoteItem[]
+
+  @@unique([tenantId, sku])
+  @@index([tenantId])
+  @@map("products")
+}
+
+model Order {
+  id          String      @id @default(uuid())
+  tenantId    String
+  tenant      Tenant      @relation(fields: [tenantId], references: [id])
+  orderNumber String
+  customerId  String
+  customer    Customer    @relation(fields: [customerId], references: [id])
+  userId      String?
+  user        User?       @relation(fields: [userId], references: [id])
+  status      String      @default("new")
+  totalNet    Decimal     @db.Decimal(10, 2)
+  totalGross  Decimal     @db.Decimal(10, 2)
+  vatRate     Decimal     @default(23) @db.Decimal(5, 2)
+  notes       String?
+  metadata    Json?
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  items       OrderItem[]
+
+  @@unique([tenantId, orderNumber])
+  @@index([tenantId])
+  @@index([customerId])
+  @@index([status])
+  @@map("orders")
+}
+
+model OrderItem {
+  id          String   @id @default(uuid())
+  orderId     String
+  order       Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productId   String
+  product     Product  @relation(fields: [productId], references: [id])
+  quantity    Int
+  unitPrice   Decimal  @db.Decimal(10, 2)
+  totalPrice  Decimal  @db.Decimal(10, 2)
+
+  @@index([orderId])
+  @@map("order_items")
+}
+
+model Quote {
+  id          String      @id @default(uuid())
+  tenantId    String
+  tenant      Tenant      @relation(fields: [tenantId], references: [id])
+  quoteNumber String
+  customerId  String
+  customer    Customer    @relation(fields: [customerId], references: [id])
+  userId      String?
+  user        User?       @relation(fields: [userId], references: [id])
+  status      String      @default("draft")
+  validUntil  DateTime?
+  totalNet    Decimal     @db.Decimal(10, 2)
+  totalGross  Decimal     @db.Decimal(10, 2)
+  vatRate     Decimal     @default(23) @db.Decimal(5, 2)
+  notes       String?
+  metadata    Json?
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  items       QuoteItem[]
+
+  @@unique([tenantId, quoteNumber])
+  @@index([tenantId])
+  @@index([customerId])
+  @@index([status])
+  @@map("quotes")
+}
+
+model QuoteItem {
+  id          String   @id @default(uuid())
+  quoteId     String
+  quote       Quote    @relation(fields: [quoteId], references: [id], onDelete: Cascade)
+  productId   String
+  product     Product  @relation(fields: [productId], references: [id])
+  quantity    Int
+  unitPrice   Decimal  @db.Decimal(10, 2)
+  totalPrice  Decimal  @db.Decimal(10, 2)
+
+  @@index([quoteId])
+  @@map("quote_items")
 }
