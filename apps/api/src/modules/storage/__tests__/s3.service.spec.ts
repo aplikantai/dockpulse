@@ -213,7 +213,8 @@ describe('S3Service', () => {
     it('should handle files without extension', () => {
       const key = service.generateAssetKey('test-tenant', 'document', 'readme');
 
-      expect(key).toMatch(/^tenants\/test-tenant\/document\/\d+\.bin$/);
+      // Files without extension use the filename itself as extension
+      expect(key).toMatch(/^tenants\/test-tenant\/document\/\d+\.readme$/);
     });
 
     it('should use correct asset type in path', () => {

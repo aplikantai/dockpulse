@@ -10,6 +10,21 @@ process.env.S3_SECRET_KEY = 'test';
 process.env.S3_BUCKET = 'test';
 process.env.DATABASE_URL = 'postgresql://test:test@localhost:5432/test';
 
+// Mock PrismaClient since it's not generated
+jest.mock('@prisma/client', () => ({
+  PrismaClient: class MockPrismaClient {
+    $connect() { return Promise.resolve(); }
+    $disconnect() { return Promise.resolve(); }
+    $queryRaw() { return Promise.resolve([]); }
+    $executeRawUnsafe() { return Promise.resolve(); }
+    tenant = {
+      findUnique: jest.fn().mockResolvedValue(null),
+      update: jest.fn().mockResolvedValue({}),
+      create: jest.fn().mockResolvedValue({}),
+    };
+  },
+}));
+
 // Suppress console logs during tests
 global.console = {
   ...console,

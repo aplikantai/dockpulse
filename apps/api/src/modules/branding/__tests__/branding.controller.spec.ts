@@ -158,7 +158,7 @@ describe('BrandingController', () => {
   describe('healthCheck', () => {
     it('should return health status', async () => {
       const healthResult = {
-        status: 'ok',
+        status: 'ok' as const,
         models: { text_primary: true, vision_primary: true },
         lastChecked: new Date(),
       };
@@ -172,7 +172,7 @@ describe('BrandingController', () => {
 
     it('should return degraded status when some models fail', async () => {
       const healthResult = {
-        status: 'degraded',
+        status: 'degraded' as const,
         models: { text_primary: true, vision_primary: false },
         lastChecked: new Date(),
       };

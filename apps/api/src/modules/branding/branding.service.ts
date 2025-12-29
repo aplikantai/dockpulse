@@ -473,7 +473,7 @@ export class BrandingService {
       },
     };
 
-    await this.prisma.tenant.update({
+    await (this.prisma as any).tenant.update({
       where: { slug: tenantSlug },
       data: {
         branding: brandingSettings as any, // Prisma JSONB
@@ -511,7 +511,7 @@ export class BrandingService {
     }
 
     // Query database
-    const tenant = await this.prisma.tenant.findUnique({
+    const tenant = await (this.prisma as any).tenant.findUnique({
       where: { slug: tenantSlug },
       select: { branding: true },
     });
