@@ -9,6 +9,7 @@ import {
   Logger,
   NotFoundException,
 } from '@nestjs/common';
+import { Throttle, SkipThrottle } from '@nestjs/throttler';
 import { BrandingService } from './branding.service';
 import {
   ExtractBrandingDto,
@@ -29,8 +30,10 @@ export class BrandingController {
   /**
    * Extract and SAVE branding to tenant
    * POST /api/branding/extract
+   * Rate limited: 10 requests per minute (heavy LLM + scraping operation)
    */
   @Post('extract')
+  @Throttle({ strict: { limit: 10, ttl: 60000 } })
   @HttpCode(HttpStatus.OK)
   async extractBranding(
     @Body() dto: ExtractBrandingDto,
@@ -46,8 +49,10 @@ export class BrandingController {
   /**
    * Preview branding (without saving)
    * POST /api/branding/preview
+   * Rate limited: 10 requests per minute (heavy LLM + scraping operation)
    */
   @Post('preview')
+  @Throttle({ strict: { limit: 10, ttl: 60000 } })
   @HttpCode(HttpStatus.OK)
   async previewBranding(
     @Body() dto: PreviewBrandingDto,
@@ -58,25 +63,6 @@ export class BrandingController {
       dto.websiteUrl,
       'preview',
     );
-  }
-
-  /**
-   * Get tenant branding
-   * GET /api/branding/:tenantSlug
-   */
-  @Get(':tenantSlug')
-  async getTenantBranding(
-    @Param('tenantSlug') tenantSlug: string,
-  ): Promise<BrandingSettings> {
-    this.logger.log(`Getting branding for tenant: ${tenantSlug}`);
-
-    const branding = await this.brandingService.getTenantBranding(tenantSlug);
-
-    if (!branding) {
-      throw new NotFoundException(`Branding not found for tenant: ${tenantSlug}`);
-    }
-
-    return branding;
   }
 
   /**
@@ -94,9 +80,30 @@ export class BrandingController {
   /**
    * Health check for OpenRouter models
    * GET /api/branding/health
+   * IMPORTANT: Must be BEFORE :tenantSlug to avoid route collision
    */
   @Get('health')
   async healthCheck() {
     return this.openRouterService.healthCheck();
+  }
+
+  /**
+   * Get tenant branding
+   * GET /api/branding/:tenantSlug
+   * NOTE: Wildcard route - must be LAST among GET routes
+   */
+  @Get(':tenantSlug')
+  async getTenantBranding(
+    @Param('tenantSlug') tenantSlug: string,
+  ): Promise<BrandingSettings> {
+    this.logger.log(`Getting branding for tenant: ${tenantSlug}`);
+
+    const branding = await this.brandingService.getTenantBranding(tenantSlug);
+
+    if (!branding) {
+      throw new NotFoundException(`Branding not found for tenant: ${tenantSlug}`);
+    }
+
+    return branding;
   }
 }

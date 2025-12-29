@@ -1,6 +1,8 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, BadRequestException } from '@nestjs/common';
 import axios from 'axios';
 import * as cheerio from 'cheerio';
+import * as dns from 'dns';
+import { promisify } from 'util';
 import {
   BrandingResult,
   BrandColors,
@@ -15,6 +17,8 @@ import { S3Service } from '../storage/s3.service';
 import { OpenRouterService } from './services/openrouter.service';
 import { PrismaService } from '../database/prisma.service';
 
+const dnsLookup = promisify(dns.lookup);
+
 @Injectable()
 export class BrandingService {
   private readonly logger = new Logger(BrandingService.name);
@@ -24,6 +28,74 @@ export class BrandingService {
     private readonly openRouterService: OpenRouterService,
     private readonly prisma: PrismaService,
   ) {}
+
+  /**
+   * SSRF Protection: Validate URL is safe to fetch
+   * Blocks private IPs, localhost, metadata endpoints
+   */
+  private async validateUrlSecurity(url: string): Promise<void> {
+    let parsedUrl: URL;
+
+    try {
+      parsedUrl = new URL(url);
+    } catch {
+      throw new BadRequestException('Invalid URL format');
+    }
+
+    // Only allow HTTP/HTTPS
+    if (!['http:', 'https:'].includes(parsedUrl.protocol)) {
+      throw new BadRequestException('Only HTTP/HTTPS URLs are allowed');
+    }
+
+    const hostname = parsedUrl.hostname;
+
+    // Block localhost variants
+    const localhostPatterns = ['localhost', '127.0.0.1', '::1', '0.0.0.0'];
+    if (localhostPatterns.includes(hostname.toLowerCase())) {
+      throw new BadRequestException('Localhost URLs are not allowed');
+    }
+
+    // Resolve hostname to IP and check if private
+    try {
+      const { address } = await dnsLookup(hostname);
+      if (this.isPrivateIP(address)) {
+        throw new BadRequestException('Private IP addresses are not allowed');
+      }
+    } catch (error) {
+      if (error instanceof BadRequestException) {
+        throw error;
+      }
+      throw new BadRequestException(`Cannot resolve hostname: ${hostname}`);
+    }
+  }
+
+  /**
+   * Check if IP is private/internal
+   */
+  private isPrivateIP(ip: string): boolean {
+    const parts = ip.split('.').map(Number);
+
+    // IPv4 checks
+    if (parts.length === 4) {
+      // 10.0.0.0/8
+      if (parts[0] === 10) return true;
+      // 172.16.0.0/12
+      if (parts[0] === 172 && parts[1] >= 16 && parts[1] <= 31) return true;
+      // 192.168.0.0/16
+      if (parts[0] === 192 && parts[1] === 168) return true;
+      // 127.0.0.0/8 (localhost)
+      if (parts[0] === 127) return true;
+      // 169.254.0.0/16 (link-local, includes AWS metadata)
+      if (parts[0] === 169 && parts[1] === 254) return true;
+      // 0.0.0.0
+      if (parts.every(p => p === 0)) return true;
+    }
+
+    // IPv6 localhost
+    if (ip === '::1' || ip === '::') return true;
+
+    return false;
+  }
 
   /**
    * Extract branding information from a website URL
@@ -71,9 +143,12 @@ export class BrandingService {
   }
 
   /**
-   * Fetch HTML content from a website
+   * Fetch HTML content from a website (with SSRF protection)
    */
   private async fetchWebsiteHTML(url: string): Promise<string> {
+    // SSRF Protection
+    await this.validateUrlSecurity(url);
+
     try {
       const response = await axios.get(url, {
         headers: {
@@ -86,6 +161,9 @@ export class BrandingService {
       });
       return response.data;
     } catch (error) {
+      if (error instanceof BadRequestException) {
+        throw error;
+      }
       this.logger.error(`Failed to fetch ${url}: ${error.message}`);
       throw new Error(`Cannot fetch website: ${url}`);
     }
@@ -227,9 +305,12 @@ export class BrandingService {
   }
 
   /**
-   * Convert image URL to base64
+   * Convert image URL to base64 (with SSRF protection)
    */
   private async imageToBase64(url: string): Promise<string> {
+    // SSRF Protection
+    await this.validateUrlSecurity(url);
+
     const response = await axios.get(url, {
       responseType: 'arraybuffer',
       timeout: 10000,
