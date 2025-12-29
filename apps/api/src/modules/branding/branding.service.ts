@@ -1,4 +1,6 @@
-import { Injectable, Logger, BadRequestException } from '@nestjs/common';
+import { Injectable, Logger, BadRequestException, Inject } from '@nestjs/common';
+import { CACHE_MANAGER } from '@nestjs/cache-manager';
+import { Cache } from 'cache-manager';
 import axios from 'axios';
 import * as cheerio from 'cheerio';
 import * as dns from 'dns';
@@ -23,10 +25,14 @@ const dnsLookup = promisify(dns.lookup);
 export class BrandingService {
   private readonly logger = new Logger(BrandingService.name);
 
+  private readonly CACHE_TTL = 300000; // 5 minutes
+  private readonly CACHE_PREFIX = 'branding:';
+
   constructor(
     private readonly s3Service: S3Service,
     private readonly openRouterService: OpenRouterService,
     private readonly prisma: PrismaService,
+    @Inject(CACHE_MANAGER) private readonly cacheManager: Cache,
   ) {}
 
   /**
@@ -446,7 +452,7 @@ export class BrandingService {
   }
 
   /**
-   * Save branding to tenant in platform database
+   * Save branding to tenant in platform database (invalidates cache)
    */
   async saveBrandingToTenant(
     tenantSlug: string,
@@ -475,13 +481,36 @@ export class BrandingService {
       },
     });
 
+    // Invalidate cache
+    const cacheKey = `${this.CACHE_PREFIX}${tenantSlug}`;
+    try {
+      await this.cacheManager.del(cacheKey);
+      this.logger.debug(`Cache invalidated for tenant: ${tenantSlug}`);
+    } catch (error) {
+      this.logger.warn(`Cache invalidation error: ${error.message}`);
+    }
+
     this.logger.log(`Branding saved for tenant: ${tenantSlug}`);
   }
 
   /**
-   * Get branding from tenant
+   * Get branding from tenant (with caching)
    */
   async getTenantBranding(tenantSlug: string): Promise<BrandingSettings | null> {
+    const cacheKey = `${this.CACHE_PREFIX}${tenantSlug}`;
+
+    // Check cache first
+    try {
+      const cached = await this.cacheManager.get<BrandingSettings>(cacheKey);
+      if (cached) {
+        this.logger.debug(`Cache hit for tenant: ${tenantSlug}`);
+        return cached;
+      }
+    } catch (error) {
+      this.logger.warn(`Cache read error: ${error.message}`);
+    }
+
+    // Query database
     const tenant = await this.prisma.tenant.findUnique({
       where: { slug: tenantSlug },
       select: { branding: true },
@@ -491,7 +520,17 @@ export class BrandingService {
       return null;
     }
 
-    return tenant.branding as BrandingSettings;
+    const branding = tenant.branding as BrandingSettings;
+
+    // Store in cache
+    try {
+      await this.cacheManager.set(cacheKey, branding, this.CACHE_TTL);
+      this.logger.debug(`Cached branding for tenant: ${tenantSlug}`);
+    } catch (error) {
+      this.logger.warn(`Cache write error: ${error.message}`);
+    }
+
+    return branding;
   }
 
   /**

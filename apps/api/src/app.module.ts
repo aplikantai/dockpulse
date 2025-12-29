@@ -5,6 +5,7 @@ import { APP_GUARD } from '@nestjs/core';
 import { PrismaModule } from './modules/database/prisma.module';
 import { StorageModule } from './modules/storage/storage.module';
 import { BrandingModule } from './modules/branding/branding.module';
+import { CacheModule } from './modules/cache/cache.module';
 
 @Module({
   imports: [
@@ -25,6 +26,7 @@ import { BrandingModule } from './modules/branding/branding.module';
         limit: 10, // 10 requests (for heavy endpoints)
       },
     ]),
+    CacheModule,
     PrismaModule,
     StorageModule,
     BrandingModule,
