@@ -181,7 +181,7 @@ export const CreateTenantSchema = z.object({
 // TYPE EXPORTS
 // ===========================================
 
-export type Address = z.infer<typeof AddressSchema>;
+export type AddressInput = z.infer<typeof AddressSchema>;
 export type Pagination = z.infer<typeof PaginationSchema>;
 export type Login = z.infer<typeof LoginSchema>;
 export type PortalLogin = z.infer<typeof PortalLoginSchema>;
