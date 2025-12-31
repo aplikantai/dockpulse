@@ -28,20 +28,18 @@ export class OpenRouterService {
 
   private readonly models: Record<'text' | 'vision' | 'code', ModelConfig> = {
     text: {
-      primary: process.env.OPENROUTER_MODEL_TEXT || 'xiaomi/mimo-vl-7b-instruct:free',
+      primary: process.env.OPENROUTER_MODEL_TEXT || 'google/gemini-2.0-flash-exp:free',
       fallbacks: [
-        'google/gemini-2.0-flash-exp:free',
+        'xiaomi/mimo-v2-flash:free',
         'mistralai/devstral-2512:free',
         'qwen/qwen3-coder:free',
-        'meta-llama/llama-3.2-3b-instruct:free',
+        'nvidia/nemotron-3-nano-30b-a3b:free',
       ],
     },
     vision: {
       primary: process.env.OPENROUTER_MODEL_VISION || 'google/gemini-2.0-flash-exp:free',
       fallbacks: [
-        'xiaomi/mimo-vl-7b-instruct:free',
-        'meta-llama/llama-3.2-11b-vision-instruct:free',
-        'qwen/qwen-2-vl-7b-instruct:free',
+        'xiaomi/mimo-v2-flash:free',
       ],
     },
     code: {
@@ -49,7 +47,7 @@ export class OpenRouterService {
       fallbacks: [
         'qwen/qwen3-coder:free',
         'google/gemini-2.0-flash-exp:free',
-        'deepseek/deepseek-chat-v3-0324:free',
+        'nvidia/nemotron-3-nano-30b-a3b:free',
       ],
     },
   };
