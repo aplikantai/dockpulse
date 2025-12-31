@@ -29,16 +29,16 @@ export default function HomePage() {
 
         <div className="space-y-3">
           <Link
-            href="/onboarding"
+            href="/dashboard"
             className="glass-button w-full block text-center"
           >
-            Rozpocznij konfiguracje
+            Przejdź do panelu
           </Link>
           <Link
-            href="/login"
+            href="/onboarding"
             className="glass-button-secondary w-full block text-center"
           >
-            Zaloguj sie
+            Rozpocznij konfigurację
           </Link>
         </div>
 
