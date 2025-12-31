@@ -11,6 +11,7 @@ import {
   TenantStatus,
   TenantPlan,
   TenantBrandingDto,
+  RegisterTenantDto,
 } from './dto/platform.dto';
 import * as bcrypt from 'bcrypt';
 
@@ -382,5 +383,95 @@ export class PlatformService {
 
     const settings = tenant.settings as any || {};
     return settings.modules || DEFAULT_MODULES;
+  }
+
+  /**
+   * Public registration endpoint - creates a new tenant from landing page
+   */
+  async registerTenant(dto: RegisterTenantDto): Promise<any> {
+    // Validate slug uniqueness
+    const existingTenant = await this.prisma.tenant.findUnique({
+      where: { slug: dto.slug },
+    });
+
+    if (existingTenant) {
+      throw new ConflictException('Subdomena jest już zajęta. Wybierz inną.');
+    }
+
+    // Validate slug format
+    if (!/^[a-z0-9-]+$/.test(dto.slug)) {
+      throw new BadRequestException(
+        'Subdomena może zawierać tylko małe litery, cyfry i myślniki',
+      );
+    }
+
+    // Map template to modules
+    const templateModules: Record<string, string[]> = {
+      services: ['customers', 'orders', 'quotes', 'portal'],
+      production: ['customers', 'orders', 'products', 'inventory', 'portal'],
+      trade: ['customers', 'orders', 'products', 'quotes', 'portal'],
+    };
+
+    const modules = templateModules[dto.template] || DEFAULT_MODULES;
+
+    // Start with FREE plan for new registrations
+    const plan = TenantPlan.FREE;
+    const planLimits = PLAN_LIMITS[plan];
+
+    // Generate random password for admin
+    const randomPassword = this.generateRandomPassword();
+    const hashedPassword = await bcrypt.hash(randomPassword, 10);
+
+    // Create tenant
+    const tenant = await this.prisma.tenant.create({
+      data: {
+        slug: dto.slug,
+        name: dto.companyName,
+        domain: dto.websiteUrl,
+        status: TenantStatus.ACTIVE, // Auto-activate for free plan
+        plan,
+        settings: {
+          template: dto.template,
+          modules,
+          limits: planLimits,
+          branding: {
+            companyName: dto.companyName,
+          },
+        },
+      },
+    });
+
+    // Create admin user for tenant
+    await this.prisma.user.create({
+      data: {
+        tenantId: tenant.id,
+        email: dto.adminEmail,
+        name: dto.adminName,
+        phone: dto.adminPhone,
+        password: hashedPassword,
+        role: 'admin',
+        active: true,
+      },
+    });
+
+    // TODO: Send welcome email with password
+
+    return {
+      success: true,
+      slug: tenant.slug,
+      tenantId: tenant.id,
+      message: 'Konto utworzone pomyślnie! Sprawdź email z hasłem dostępowym.',
+      loginUrl: `https://${tenant.slug}.dockpulse.com/login`,
+    };
+  }
+
+  private generateRandomPassword(): string {
+    const chars =
+      'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789!@#$%^&*';
+    let password = '';
+    for (let i = 0; i < 12; i++) {
+      password += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return password;
   }
 }

@@ -69,6 +69,14 @@ dockpulse/
 │           ├── app/            # App Router pages
 │           ├── components/     # UI components
 │           └── lib/            # Utilities
+├── landing/                    # ⭐ Landing Page (Vite + React)
+│   ├── components/
+│   │   ├── Registration.tsx   # Modal rejestracji tenantow
+│   │   ├── Hero.tsx
+│   │   ├── Features.tsx
+│   │   └── ...
+│   ├── dist/                  # Build output
+│   └── index.html
 ├── packages/
 │   ├── shared/                 # Shared types, schemas (Zod)
 │   ├── ui/                     # Shared UI components
@@ -76,6 +84,8 @@ dockpulse/
 ├── docker/
 ├── scripts/
 ├── docs/
+│   ├── DEPLOYMENT-FULL.md     # ⭐ Pelna instrukcja wdrozenia
+│   └── ...
 └── .github/workflows/
 ```
 
@@ -112,17 +122,51 @@ pnpm db:seed
 # Dev server (API + Web)
 pnpm dev
 
+# Landing Page (osobno)
+cd landing
+npm install
+npm run dev  # Port 3001
+
 # Build
 pnpm build
-
-# Testy
-pnpm test
 ```
 
-### Tworzenie tenanta
+### Rejestracja nowego tenanta
+
+#### Opcja 1: Przez Landing Page (zalecane)
+
+1. Otwórz `http://localhost:3001`
+2. Kliknij "Rozpocznij za darmo"
+3. Wypełnij formularz 3-etapowy:
+   - Wybór szablonu (Usługi/Produkcja/Handel)
+   - Dane firmy (nazwa, subdomena, URL)
+   - Konto admina (imię, email, telefon)
+4. System automatycznie:
+   - Tworzy tenanta i bazę danych
+   - Zakłada konto administratora
+   - Wysyła email z hasłem
+   - Przekierowuje do panelu logowania
+
+#### Opcja 2: Przez CLI
 
 ```bash
 ./scripts/create-tenant.sh --slug=acme --name="ACME Corp" --template=services
+```
+
+#### Opcja 3: Przez API
+
+```bash
+curl -X POST http://localhost:3333/api/platform/tenants/register \
+  -H "Content-Type: application/json" \
+  -d '{
+    "companyName": "ACME Corporation",
+    "slug": "acme",
+    "template": "services",
+    "websiteUrl": "https://acme.com",
+    "adminName": "Jan Kowalski",
+    "adminEmail": "jan@acme.com",
+    "adminPhone": "+48 123 456 789"
+  }'
 ```
 
 ---
@@ -181,7 +225,9 @@ pnpm test
 | [ARCHITEKTURA.md](docs/ARCHITEKTURA.md) | Architektura systemu |
 | [API.md](docs/API.md) | Dokumentacja API |
 | [SZABLONY.md](docs/SZABLONY.md) | Szablony branzowe |
-| [DEPLOYMENT.md](docs/DEPLOYMENT.md) | Instrukcja deploymentu |
+| [AUTO-BRANDING.md](docs/AUTO-BRANDING.md) | System auto-brandingu |
+| [DEPLOYMENT-FULL.md](docs/DEPLOYMENT-FULL.md) | ⭐ Pelna instrukcja wdrozenia + landing page |
+| [landing/README.md](landing/README.md) | Landing page - quick start |
 
 ---
 

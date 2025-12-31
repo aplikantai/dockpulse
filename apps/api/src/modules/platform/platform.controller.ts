@@ -19,6 +19,7 @@ import {
 } from '@nestjs/swagger';
 import { PlatformService } from './platform.service';
 import { PlatformAuthService } from './platform-auth.service';
+import { Public } from '../auth/decorators/public.decorator';
 import {
   PlatformAdminGuard,
   SuperAdminGuard,
@@ -32,6 +33,7 @@ import {
   TenantPlan,
   PlatformLoginDto,
   CreatePlatformAdminDto,
+  RegisterTenantDto,
 } from './dto/platform.dto';
 
 @ApiTags('Platform Admin')
@@ -182,6 +184,15 @@ export class PlatformController {
 
   // ============ PUBLIC (for onboarding) ============
 
+  @Public()
+  @Post('tenants/register')
+  @ApiOperation({ summary: 'Publiczna rejestracja nowego tenanta (landing page)' })
+  @HttpCode(HttpStatus.CREATED)
+  async register(@Body() dto: RegisterTenantDto) {
+    return this.platformService.registerTenant(dto);
+  }
+
+  @Public()
   @Get('tenants/check/:slug')
   @ApiOperation({ summary: 'Sprawdź dostępność slug' })
   async checkSlug(@Param('slug') slug: string) {

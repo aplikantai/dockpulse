@@ -154,3 +154,36 @@ export class CreatePlatformAdminDto {
   @IsBoolean()
   isSuperAdmin?: boolean;
 }
+
+export class RegisterTenantDto {
+  @ApiProperty({ example: 'ACME Corporation' })
+  @IsString()
+  companyName: string;
+
+  @ApiProperty({ example: 'acme' })
+  @IsString()
+  @MinLength(3)
+  slug: string;
+
+  @ApiProperty({ enum: ['services', 'production', 'trade'], example: 'services' })
+  @IsString()
+  @IsEnum(['services', 'production', 'trade'])
+  template: 'services' | 'production' | 'trade';
+
+  @ApiPropertyOptional({ example: 'https://acme.com' })
+  @IsOptional()
+  @IsString()
+  websiteUrl?: string;
+
+  @ApiProperty({ example: 'Jan Kowalski' })
+  @IsString()
+  adminName: string;
+
+  @ApiProperty({ example: 'jan@acme.com' })
+  @IsEmail()
+  adminEmail: string;
+
+  @ApiProperty({ example: '+48 123 456 789' })
+  @IsString()
+  adminPhone: string;
+}
