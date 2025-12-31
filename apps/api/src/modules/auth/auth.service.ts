@@ -60,10 +60,19 @@ export class AuthService {
     return result;
   }
 
-  async login(dto: LoginDto, tenantId: string): Promise<AuthResponseWithRefresh> {
+  async login(dto: LoginDto, tenantSlug: string): Promise<AuthResponseWithRefresh> {
     const user = await this.validateUser(dto.email, dto.password);
 
-    if (user.tenantId !== tenantId) {
+    // Resolve tenant by slug to get the actual ID
+    const tenant = await (this.prisma as any).tenant.findUnique({
+      where: { slug: tenantSlug },
+    });
+
+    if (!tenant) {
+      throw new UnauthorizedException('Invalid tenant');
+    }
+
+    if (user.tenantId !== tenant.id) {
       throw new UnauthorizedException('User does not belong to this tenant');
     }
 
@@ -89,7 +98,16 @@ export class AuthService {
     };
   }
 
-  async register(dto: RegisterDto, tenantId: string): Promise<AuthResponseWithRefresh> {
+  async register(dto: RegisterDto, tenantSlug: string): Promise<AuthResponseWithRefresh> {
+    // Resolve tenant by slug to get the actual ID
+    const tenant = await (this.prisma as any).tenant.findUnique({
+      where: { slug: tenantSlug },
+    });
+
+    if (!tenant) {
+      throw new UnauthorizedException('Invalid tenant');
+    }
+
     const existingUser = await (this.prisma as any).user.findUnique({
       where: { email: dto.email },
     });
@@ -106,7 +124,7 @@ export class AuthService {
         password: hashedPassword,
         name: dto.name,
         role: dto.role || 'user',
-        tenantId,
+        tenantId: tenant.id,
       },
     });
 

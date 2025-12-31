@@ -11,6 +11,7 @@ interface CompletionOptions {
   responseFormat?: { type: 'json_object' | 'text' };
   temperature?: number;
   maxTokens?: number;
+  apiKey?: string; // Optional tenant-specific API key
 }
 
 export interface ModelHealthStatus {
@@ -22,35 +23,79 @@ export interface ModelHealthStatus {
 @Injectable()
 export class OpenRouterService {
   private readonly logger = new Logger(OpenRouterService.name);
-  private readonly client: OpenAI;
+  private readonly defaultClient: OpenAI;
+  private readonly clientCache: Map<string, OpenAI> = new Map();
 
-  private readonly models: Record<'text' | 'vision', ModelConfig> = {
+  private readonly models: Record<'text' | 'vision' | 'code', ModelConfig> = {
     text: {
-      primary: process.env.OPENROUTER_MODEL_TEXT || 'meta-llama/llama-3.2-3b-instruct:free',
+      primary: process.env.OPENROUTER_MODEL_TEXT || 'xiaomi/mimo-vl-7b-instruct:free',
       fallbacks: [
-        'qwen/qwen-2-7b-instruct:free',
-        'mistralai/mistral-7b-instruct:free',
-        'google/gemma-2-9b-it:free',
+        'google/gemini-2.0-flash-exp:free',
+        'mistralai/devstral-2512:free',
+        'qwen/qwen3-coder:free',
+        'meta-llama/llama-3.2-3b-instruct:free',
       ],
     },
     vision: {
       primary: process.env.OPENROUTER_MODEL_VISION || 'google/gemini-2.0-flash-exp:free',
       fallbacks: [
+        'xiaomi/mimo-vl-7b-instruct:free',
         'meta-llama/llama-3.2-11b-vision-instruct:free',
         'qwen/qwen-2-vl-7b-instruct:free',
+      ],
+    },
+    code: {
+      primary: process.env.OPENROUTER_MODEL_CODE || 'mistralai/devstral-2512:free',
+      fallbacks: [
+        'qwen/qwen3-coder:free',
+        'google/gemini-2.0-flash-exp:free',
+        'deepseek/deepseek-chat-v3-0324:free',
       ],
     },
   };
 
   constructor() {
-    this.client = new OpenAI({
+    this.defaultClient = new OpenAI({
       baseURL: process.env.OPENROUTER_BASE_URL || 'https://openrouter.ai/api/v1',
-      apiKey: process.env.OPENROUTER_API_KEY,
+      apiKey: process.env.OPENROUTER_API_KEY || 'sk-or-v1-placeholder',
       defaultHeaders: {
         'HTTP-Referer': process.env.FRONTEND_URL || 'https://dockpulse.com',
         'X-Title': 'DockPulse',
       },
     });
+  }
+
+  /**
+   * Get OpenAI client for specific API key (cached)
+   */
+  private getClient(apiKey?: string): OpenAI {
+    if (!apiKey) {
+      return this.defaultClient;
+    }
+
+    // Check cache
+    if (this.clientCache.has(apiKey)) {
+      return this.clientCache.get(apiKey)!;
+    }
+
+    // Create new client for this API key
+    const client = new OpenAI({
+      baseURL: process.env.OPENROUTER_BASE_URL || 'https://openrouter.ai/api/v1',
+      apiKey,
+      defaultHeaders: {
+        'HTTP-Referer': process.env.FRONTEND_URL || 'https://dockpulse.com',
+        'X-Title': 'DockPulse',
+      },
+    });
+
+    // Cache with max size limit
+    if (this.clientCache.size > 100) {
+      const firstKey = this.clientCache.keys().next().value;
+      if (firstKey) this.clientCache.delete(firstKey);
+    }
+    this.clientCache.set(apiKey, client);
+
+    return client;
   }
 
   /**
@@ -68,14 +113,22 @@ export class OpenRouterService {
   }
 
   /**
+   * Execute code completion with automatic fallback (optimized for coding tasks)
+   */
+  async codeCompletion(options: CompletionOptions): Promise<string> {
+    return this.executeWithFallback('code', options);
+  }
+
+  /**
    * Execute completion with fallback models on failure
    */
   private async executeWithFallback(
-    type: 'text' | 'vision',
+    type: 'text' | 'vision' | 'code',
     options: CompletionOptions,
   ): Promise<string> {
     const modelConfig = this.models[type];
     const allModels = [modelConfig.primary, ...modelConfig.fallbacks];
+    const client = this.getClient(options.apiKey);
 
     let lastError: Error | null = null;
 
@@ -87,7 +140,7 @@ export class OpenRouterService {
         this.logger.debug(`Trying ${type} model: ${model} (${isPrimary ? 'primary' : 'fallback'})`);
         const startTime = Date.now();
 
-        const response = await this.client.chat.completions.create({
+        const response = await client.chat.completions.create({
           model,
           messages: options.messages,
           response_format: options.responseFormat,
@@ -129,12 +182,13 @@ export class OpenRouterService {
   /**
    * Check health of OpenRouter models
    */
-  async healthCheck(): Promise<ModelHealthStatus> {
+  async healthCheck(apiKey?: string): Promise<ModelHealthStatus> {
+    const client = this.getClient(apiKey);
     const results: Record<string, boolean> = {};
 
     for (const [type, config] of Object.entries(this.models)) {
       try {
-        await this.client.chat.completions.create({
+        await client.chat.completions.create({
           model: config.primary,
           messages: [{ role: 'user', content: 'Hi' }],
           max_tokens: 5,
@@ -158,7 +212,7 @@ export class OpenRouterService {
   /**
    * Get available models configuration
    */
-  getModelsConfig(): Record<'text' | 'vision', ModelConfig> {
+  getModelsConfig(): Record<'text' | 'vision' | 'code', ModelConfig> {
     return this.models;
   }
 

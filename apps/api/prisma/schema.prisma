@@ -269,3 +269,25 @@ model QuoteItem {
   @@index([quoteId])
   @@map("quote_items")
 }
+
+// ===========================================
+// API KEYS (per tenant, for OpenRouter/AI services)
+// ===========================================
+
+model ApiKey {
+  id          String   @id @default(uuid())
+  tenantId    String
+  name        String   // Company name / key name
+  service     String   // 'openrouter' | 'openai' | 'anthropic' | etc.
+  apiKey      String   // Encrypted API key
+  isActive    Boolean  @default(true)
+  usageCount  Int      @default(0)
+  lastUsedAt  DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([tenantId, service])
+  @@index([tenantId])
+  @@index([service])
+  @@map("api_keys")
+}
