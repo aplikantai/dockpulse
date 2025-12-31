@@ -6,13 +6,112 @@
 
 ## 📋 Spis Treści
 
-1. [Wymagania](#wymagania)
-2. [Konfiguracja Bazy Danych](#konfiguracja-bazy-danych)
-3. [Konfiguracja Backendu (API)](#konfiguracja-backendu-api)
-4. [Konfiguracja Landing Page](#konfiguracja-landing-page)
-5. [Konfiguracja Reverse Proxy](#konfiguracja-reverse-proxy)
-6. [Uruchomienie Systemu](#uruchomienie-systemu)
-7. [Testowanie Flow Rejestracji](#testowanie-flow-rejestracji)
+1. [System Logowania](#system-logowania)
+2. [Wymagania](#wymagania)
+3. [Konfiguracja Bazy Danych](#konfiguracja-bazy-danych)
+4. [Konfiguracja Backendu (API)](#konfiguracja-backendu-api)
+5. [Konfiguracja Landing Page](#konfiguracja-landing-page)
+6. [Konfiguracja Reverse Proxy](#konfiguracja-reverse-proxy)
+7. [Uruchomienie Systemu](#uruchomienie-systemu)
+8. [Testowanie Flow Rejestracji](#testowanie-flow-rejestracji)
+9. [Master Deployment TODO](#master-deployment-todo)
+
+---
+
+## 🔐 System Logowania
+
+### Uniwersalne Logowanie (Email lub Telefon)
+
+DockPulse obsługuje **elastyczne logowanie** dla wszystkich typów użytkowników:
+
+**Użytkownicy (pracownicy):**
+- ✅ Email + hasło: `jan@firma.pl`
+- ✅ Telefon + hasło: `+48123456789` lub `123456789`
+- 🔜 SMS 2FA (planowane)
+
+**Klienci (portal):**
+- ✅ Email + hasło: `klient@domena.pl`
+- ✅ Telefon + hasło: `+48123456789`
+- 🔜 SMS OTP (planowane)
+
+### Implementacja w kodzie
+
+```typescript
+// Backend - AuthService
+async validateUser(login: string, password: string) {
+  // Sprawdź czy login to email czy telefon
+  const isEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(login);
+  const isPhone = /^\+?[0-9]{9,15}$/.test(login);
+
+  let user;
+  if (isEmail) {
+    user = await this.prisma.user.findUnique({ where: { email: login } });
+  } else if (isPhone) {
+    const normalizedPhone = login.startsWith('+') ? login : `+48${login}`;
+    user = await this.prisma.user.findUnique({ where: { phone: normalizedPhone } });
+  }
+
+  // Sprawdź hasło
+  if (user && await bcrypt.compare(password, user.password)) {
+    return user;
+  }
+  return null;
+}
+```
+
+### Frontend - Login Form
+
+```tsx
+// Login page - akceptuje email lub telefon
+<Input
+  type="text"
+  placeholder="Email lub numer telefonu"
+  {...register('login')}
+/>
+```
+
+### Baza danych
+
+```prisma
+model User {
+  id       String  @id @default(uuid())
+  email    String? @unique
+  phone    String? @unique  // Format: +48123456789
+  password String
+  name     String
+  role     String
+  // ...
+}
+
+model Customer {
+  id       String  @id @default(uuid())
+  email    String? @unique
+  phone    String  @unique  // WYMAGANE dla portalu
+  password String?          // Dla dostępu do portalu
+  name     String
+  // ...
+}
+```
+
+### Walidacja
+
+```typescript
+// DTO - LoginDto
+import { IsString, Matches } from 'class-validator';
+
+export class LoginDto {
+  @IsString()
+  @Matches(
+    /^([^\s@]+@[^\s@]+\.[^\s@]+|\+?[0-9]{9,15})$/,
+    { message: 'Login must be valid email or phone number' }
+  )
+  login: string;
+
+  @IsString()
+  @MinLength(6)
+  password: string;
+}
+```
 
 ---
 
@@ -546,3 +645,77 @@ Po uruchomieniu systemu:
 **Wersja**: 2.0
 **Data**: 31 Grudzień 2024
 **Autor**: DockPulse Team
+
+---
+
+## 📋 Master Deployment TODO
+
+Dla szczegółowego, krok po kroku przewodnika deployment z automatycznymi testami i checkpointami, zobacz:
+
+**[DEPLOYMENT-TODO.md](./DEPLOYMENT-TODO.md)** - Kompletny master plan deployment
+
+Dokument zawiera:
+- ✅ System checkpointów i progress tracking
+- ✅ Automatyczne testy dla każdego kroku
+- ✅ Szczegółowe komendy do wykonania
+- ✅ Zasady dla automatyzacji (Claude Code)
+- ✅ Rollback procedures
+- ✅ 6 sprintów deployment (Infrastruktura → Landing → Backend → Frontend → Multi-tenancy → Portal → Integracje)
+
+### Quick Start Deployment
+
+```bash
+# 1. SSH do serwera
+ssh root@91.228.199.170
+
+# 2. Sprawdź postęp (jeśli deployment już rozpoczęty)
+tail -50 /var/www/dockpulse.com/PROGRESS.log
+
+# 3. Wznów od ostatniego checkpoint
+grep "CHECKPOINT" /var/www/dockpulse.com/PROGRESS.log | tail -1
+
+# 4. Kontynuuj według DEPLOYMENT-TODO.md
+```
+
+### Struktura Sprintów
+
+```
+Sprint 0: INFRASTRUKTURA (30min) → CP-001 ✅
+Sprint 1: LANDING PAGE (20min)   → CP-002 ✅
+Sprint 2: BACKEND API (45min)    → CP-003 ✅
+Sprint 3: FRONTEND CRM (60min)   → CP-004 ✅
+Sprint 4: MULTI-TENANCY (30min)  → CP-005 ✅
+Sprint 5: PORTAL KLIENTA (30min) → CP-006 ✅
+Sprint 6: INTEGRACJE (20min)     → CP-007 ✅
+```
+
+Każdy sprint ma:
+- **User Stories** - Perspektywa użytkownika
+- **Acceptance Criteria** - Kryteria sukcesu
+- **Komendy** - Dokładne komendy bash
+- **Testy** - Automatyczna weryfikacja
+- **Checkpoint** - Punkt zapisywania postępu
+
+---
+
+## 🔄 Git Workflow
+
+### Push zmian do GitHub
+
+```bash
+# Upewnij się że jesteś w głównym katalogu
+cd /root/dockpulse
+
+# Sprawdź status
+git status
+
+# Jeśli są niezaktualizowane zmiany
+git add -A
+git commit -m "Update deployment documentation and login system"
+
+# Push (wymaga autentykacji)
+git push origin main
+```
+
+---
+
