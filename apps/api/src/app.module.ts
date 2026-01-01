@@ -20,6 +20,7 @@ import { PlatformModule } from './modules/platform/platform.module';
 import { HealthController } from './health.controller';
 import { EventsModule } from './modules/events/events.module';
 import { DataBusModule } from './modules/data-bus/data-bus.module';
+import { ModuleRegistryModule } from './modules/module-registry/module-registry.module';
 
 @Module({
   imports: [
@@ -44,6 +45,7 @@ import { DataBusModule } from './modules/data-bus/data-bus.module';
     PrismaModule,
     EventsModule, // EVENT BUS - Must be imported early
     DataBusModule, // DATA BUS - Must be imported early
+    ModuleRegistryModule, // MODULE REGISTRY - Must be imported early
     StorageModule,
     BrandingModule,
     AuthModule,
