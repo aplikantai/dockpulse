@@ -94,6 +94,8 @@ model WorkflowTrigger {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
+  executions  WorkflowExecution[]
+
   @@unique([tenantId, code])
   @@index([tenantId])
   @@index([eventType])
@@ -114,6 +116,7 @@ model EventLog {
   entityId    String
   userId      String?
   payload     Json     @default("{}")
+  metadata    Json?    // Event metadata (version, correlationId, etc.)
   createdAt   DateTime @default(now())
 
   @@index([tenantId])
@@ -290,4 +293,26 @@ model ApiKey {
   @@index([tenantId])
   @@index([service])
   @@map("api_keys")
+}
+
+// ===========================================
+// WORKFLOW EXECUTIONS (event-driven automation)
+// ===========================================
+
+model WorkflowExecution {
+  id          String    @id @default(uuid())
+  triggerId   String
+  trigger     WorkflowTrigger @relation(fields: [triggerId], references: [id], onDelete: Cascade)
+  tenantId    String
+  eventId     String    // Reference to EventLog
+  status      String    // 'SUCCESS' | 'FAILED' | 'PENDING'
+  error       String?   // Error message if failed
+  result      Json?     // Execution result
+  executedAt  DateTime  @default(now())
+
+  @@index([triggerId])
+  @@index([tenantId])
+  @@index([eventId])
+  @@index([status])
+  @@map("workflow_executions")
 }
