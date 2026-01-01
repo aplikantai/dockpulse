@@ -19,6 +19,7 @@ export class PlatformAuthService {
     private readonly jwtService: JwtService,
   ) {}
 
+  // TODO: Refactor after plan/status moved to settings JSON
   async login(dto: PlatformLoginDto): Promise<{
     access_token: string;
     admin: {
@@ -32,9 +33,10 @@ export class PlatformAuthService {
     // For now, we'll use the users table with tenantId = null
     const admin = await this.prisma.$queryRaw<any[]>`
       SELECT * FROM platform_admins
-      WHERE email = ${dto.email} AND active = true
+      WHERE email = ${dto.email}
       LIMIT 1
     `.catch(() => []);
+    // Removed: active = true check - field doesn't exist
 
     // If no platform_admins table, fallback to check for special users
     let adminUser = admin[0];
@@ -45,7 +47,7 @@ export class PlatformAuthService {
         where: {
           email: dto.email,
           tenantId: null as any, // Platform-level admin
-          active: true,
+          // active: true, // Removed - field doesn't exist in schema
         },
       });
 
@@ -92,6 +94,7 @@ export class PlatformAuthService {
     };
   }
 
+  // TODO: Refactor after plan/status moved to settings JSON
   async createAdmin(dto: CreatePlatformAdminDto): Promise<any> {
     // Check if email exists
     const existing = await this.prisma.user.findFirst({
@@ -111,7 +114,7 @@ export class PlatformAuthService {
         name: dto.name,
         password: hashedPassword,
         role: dto.isSuperAdmin ? 'super_admin' : 'platform_admin',
-        active: true,
+        // active: true, // Removed - field doesn't exist in schema
         // tenantId is null for platform admins
       } as any,
     });
@@ -124,6 +127,7 @@ export class PlatformAuthService {
     };
   }
 
+  // TODO: Refactor after plan/status moved to settings JSON
   async getAdmins(): Promise<any[]> {
     return this.prisma.user.findMany({
       where: {
@@ -135,9 +139,9 @@ export class PlatformAuthService {
         email: true,
         name: true,
         role: true,
-        active: true,
+        // active: true, // Removed - field doesn't exist in schema
         createdAt: true,
-        lastLogin: true,
+        // lastLogin: true, // Removed - field doesn't exist in schema
       },
     });
   }
