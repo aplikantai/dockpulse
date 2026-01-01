@@ -25,6 +25,7 @@ import { StockModule } from './modules/stock/stock.module';
 import { CalendarModule } from './modules/calendar/calendar.module';
 import { InvoicingModule } from './modules/invoicing/invoicing.module';
 import { AdminModule } from './modules/admin/admin.module';
+import { WebhooksModule } from './modules/webhooks/webhooks.module';
 
 @Module({
   imports: [
@@ -64,6 +65,7 @@ import { AdminModule } from './modules/admin/admin.module';
     StockModule, // @stock module - extends Product entity
     CalendarModule, // @calendar module - extends Customer and Order entities
     InvoicingModule, // @invoicing module - extends Order and Customer entities
+    WebhooksModule, // @webhooks module - outbound webhooks and event subscriptions
     AdminModule, // Platform Admin Panel
   ],
   controllers: [HealthController],
