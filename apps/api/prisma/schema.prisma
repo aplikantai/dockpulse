@@ -127,15 +127,16 @@ model EventLog {
 }
 
 model User {
-  id        String   @id @default(uuid())
-  email     String   @unique
+  id        String    @id @default(uuid())
+  email     String    @unique
   password  String
   name      String?
   tenantId  String
-  tenant    Tenant   @relation(fields: [tenantId], references: [id])
-  role      String   @default("user")
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  tenant    Tenant    @relation(fields: [tenantId], references: [id])
+  role      String    @default("user")
+  lastLogin DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
 
   orders    Order[]
   quotes    Quote[]

@@ -30,6 +30,16 @@ export interface ModuleDefinition {
   category: ModuleCategory;
 
   /**
+   * Module author
+   */
+  author?: string;
+
+  /**
+   * Minimum plan required
+   */
+  minPlan?: TenantPlan;
+
+  /**
    * NestJS module class
    */
   moduleClass: Type<any>;
@@ -187,6 +197,8 @@ export class ModuleDefinitionFactory {
     description?: string;
     version: string;
     category: ModuleCategory;
+    author?: string;
+    minPlan?: TenantPlan;
     moduleClass: Type<any>;
     dependencies?: string[];
     incompatibleWith?: string[];
@@ -204,6 +216,8 @@ export class ModuleDefinitionFactory {
       description: params.description,
       version: params.version,
       category: params.category,
+      author: params.author,
+      minPlan: params.minPlan || params.requiredPlan || TenantPlan.FREE,
       moduleClass: params.moduleClass,
       dependencies: params.dependencies || [],
       incompatibleWith: params.incompatibleWith || [],

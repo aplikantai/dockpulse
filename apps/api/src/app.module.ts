@@ -22,6 +22,7 @@ import { EventsModule } from './modules/events/events.module';
 import { DataBusModule } from './modules/data-bus/data-bus.module';
 import { ModuleRegistryModule } from './modules/module-registry/module-registry.module';
 import { StockModule } from './modules/stock/stock.module';
+import { AdminModule } from './modules/admin/admin.module';
 
 @Module({
   imports: [
@@ -59,6 +60,7 @@ import { StockModule } from './modules/stock/stock.module';
     ProductsModule,
     SettingsModule,
     StockModule, // @stock module - extends Product entity
+    AdminModule, // Platform Admin Panel
   ],
   controllers: [HealthController],
   providers: [

@@ -315,6 +315,26 @@ export class ModuleRegistryService implements OnModuleInit {
   }
 
   /**
+   * Install a module for a tenant (alias for enableModule)
+   */
+  async installModule(
+    tenantId: string,
+    moduleCode: string,
+    config?: Record<string, any>,
+  ): Promise<void> {
+    await this.enableModule(tenantId, moduleCode, config);
+    this.logger.log(`Installed module ${moduleCode} for tenant ${tenantId}`);
+  }
+
+  /**
+   * Uninstall a module from a tenant (alias for disableModule)
+   */
+  async uninstallModule(tenantId: string, moduleCode: string): Promise<void> {
+    await this.disableModule(tenantId, moduleCode);
+    this.logger.log(`Uninstalled module ${moduleCode} from tenant ${tenantId}`);
+  }
+
+  /**
    * Check if a plan is sufficient for required plan
    */
   private isPlanRequired(
