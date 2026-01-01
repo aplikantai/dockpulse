@@ -68,6 +68,7 @@ export class BrandingController {
    * POST /api/branding/preview
    * Rate limited: 10 requests per minute (heavy LLM + scraping operation)
    */
+  @Public()
   @Post('preview')
   @Throttle({ strict: { limit: 10, ttl: 60000 } })
   @HttpCode(HttpStatus.OK)

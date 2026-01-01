@@ -5,12 +5,12 @@ import { PortalAuthService } from './portal-auth.service';
 import { PortalOrdersService } from './portal-orders.service';
 import { PortalQuotesService } from './portal-quotes.service';
 import { PortalAuthGuard } from './guards/portal-auth.guard';
-import { DatabaseModule } from '../database/prisma.module';
+import { PrismaModule } from '../database/prisma.module';
 import { NotificationsModule } from '../notifications/notifications.module';
 
 @Module({
   imports: [
-    DatabaseModule,
+    PrismaModule,
     NotificationsModule,
     JwtModule.register({
       secret: process.env.JWT_SECRET,

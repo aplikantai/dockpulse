@@ -18,14 +18,14 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
             store: redisStore,
             url: redisUrl,
             ttl: 300000, // 5 minutes default
-          };
+          } as any;
         }
 
         // Fallback to in-memory cache
         return {
           ttl: 300000, // 5 minutes
           max: 100, // Maximum items in cache
-        };
+        } as any;
       },
     }),
   ],

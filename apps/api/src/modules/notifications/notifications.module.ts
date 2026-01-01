@@ -3,10 +3,10 @@ import { NotificationsController } from './notifications.controller';
 import { NotificationsService } from './notifications.service';
 import { EmailService } from './services/email.service';
 import { SmsService } from './services/sms.service';
-import { DatabaseModule } from '../database/prisma.module';
+import { PrismaModule } from '../database/prisma.module';
 
 @Module({
-  imports: [DatabaseModule],
+  imports: [PrismaModule],
   controllers: [NotificationsController],
   providers: [NotificationsService, EmailService, SmsService],
   exports: [NotificationsService, EmailService, SmsService],

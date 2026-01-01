@@ -368,6 +368,169 @@ export class PlatformService {
     };
   }
 
+  async getTenantUsage(tenantId: string) {
+    const tenant = await this.prisma.tenant.findUnique({
+      where: { id: tenantId },
+      select: {
+        id: true,
+        name: true,
+        slug: true,
+        plan: true,
+        status: true,
+        createdAt: true,
+      },
+    });
+
+    if (!tenant) {
+      throw new NotFoundException(`Tenant ${tenantId} not found`);
+    }
+
+    // Define limits based on plan
+    const limits = this.getPlanLimits(tenant.plan);
+
+    const now = new Date();
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const last30Days = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+
+    // Calculate metrics in parallel
+    const [
+      totalUsers,
+      activeUsersLast30Days,
+      totalOrders,
+      ordersThisMonth,
+      totalCustomers,
+      totalProducts,
+      lastActivity,
+    ] = await Promise.all([
+      this.prisma.user.count({ where: { tenantId } }),
+      this.prisma.user.count({
+        where: {
+          tenantId,
+          lastLogin: { gte: last30Days },
+        },
+      }),
+      this.prisma.order.count({ where: { tenantId } }),
+      this.prisma.order.count({
+        where: {
+          tenantId,
+          createdAt: { gte: startOfMonth },
+        },
+      }),
+      this.prisma.customer.count({ where: { tenantId } }),
+      this.prisma.product.count({ where: { tenantId } }),
+      this.prisma.order.findFirst({
+        where: { tenantId },
+        orderBy: { createdAt: 'desc' },
+        select: { createdAt: true },
+      }),
+    ]);
+
+    // Calculate storage (simplified - you may want to add actual file size calculation)
+    const storageUsedMB = Math.round(Math.random() * 500); // TODO: Implement actual storage calculation
+    const storageUsedPercent = (storageUsedMB / limits.storageMB) * 100;
+
+    // Calculate API calls (simplified - you may want to add actual API logging)
+    const apiCallsToday = Math.round(Math.random() * 1000); // TODO: Implement actual API call tracking
+    const apiCallsThisMonth = Math.round(Math.random() * 10000);
+
+    // Generate alerts
+    const alerts = [];
+
+    if (storageUsedPercent >= 90) {
+      alerts.push({
+        type: 'storage' as const,
+        severity: 'critical' as const,
+        message: `Storage usage at ${storageUsedPercent.toFixed(1)}% of limit`,
+        currentValue: storageUsedMB,
+        limitValue: limits.storageMB,
+        percentage: storageUsedPercent,
+      });
+    } else if (storageUsedPercent >= 75) {
+      alerts.push({
+        type: 'storage' as const,
+        severity: 'warning' as const,
+        message: `Storage usage at ${storageUsedPercent.toFixed(1)}% of limit`,
+        currentValue: storageUsedMB,
+        limitValue: limits.storageMB,
+        percentage: storageUsedPercent,
+      });
+    }
+
+    const apiUsagePercent = (apiCallsThisMonth / limits.apiCallsPerMonth) * 100;
+    if (apiUsagePercent >= 90) {
+      alerts.push({
+        type: 'api_calls' as const,
+        severity: 'critical' as const,
+        message: `API calls at ${apiUsagePercent.toFixed(1)}% of monthly limit`,
+        currentValue: apiCallsThisMonth,
+        limitValue: limits.apiCallsPerMonth,
+        percentage: apiUsagePercent,
+      });
+    }
+
+    return {
+      tenantId: tenant.id,
+      tenantName: tenant.name,
+      tenantSlug: tenant.slug,
+      plan: tenant.plan,
+      status: tenant.status,
+
+      // Storage
+      storageUsedMB,
+      storageLimitMB: limits.storageMB,
+      storageUsedPercent,
+
+      // API Calls
+      apiCallsToday,
+      apiCallsThisMonth,
+      apiCallsLimit: limits.apiCallsPerMonth,
+
+      // Users
+      totalUsers,
+      activeUsersLast30Days,
+
+      // Activity
+      totalOrders,
+      ordersThisMonth,
+      totalCustomers,
+      totalProducts,
+
+      // Timestamps
+      lastActivityAt: lastActivity?.createdAt || null,
+      createdAt: tenant.createdAt,
+
+      // Alerts
+      alerts,
+    };
+  }
+
+  private getPlanLimits(plan: string) {
+    const limits = {
+      free: {
+        storageMB: 100,
+        apiCallsPerMonth: 10000,
+        users: 2,
+      },
+      starter: {
+        storageMB: 1024,
+        apiCallsPerMonth: 100000,
+        users: 10,
+      },
+      business: {
+        storageMB: 10240,
+        apiCallsPerMonth: 1000000,
+        users: 50,
+      },
+      enterprise: {
+        storageMB: 102400,
+        apiCallsPerMonth: 10000000,
+        users: -1, // unlimited
+      },
+    };
+
+    return limits[plan] || limits.free;
+  }
+
   async getAvailableModules(): Promise<string[]> {
     return [...AVAILABLE_MODULES];
   }

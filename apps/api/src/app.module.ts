@@ -16,6 +16,7 @@ import { OrdersModule } from './modules/orders/orders.module';
 import { QuotesModule } from './modules/quotes/quotes.module';
 import { ProductsModule } from './modules/products/products.module';
 import { SettingsModule } from './modules/settings/settings.module';
+import { PlatformModule } from './modules/platform/platform.module';
 import { HealthController } from './health.controller';
 
 @Module({
@@ -43,6 +44,7 @@ import { HealthController } from './health.controller';
     BrandingModule,
     AuthModule,
     TenantModule,
+    PlatformModule,
     UsersModule,
     CustomersModule,
     OrdersModule,

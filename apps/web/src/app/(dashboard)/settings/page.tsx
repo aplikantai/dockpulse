@@ -2,15 +2,17 @@
 
 import { PageHeader } from '@/components/layout';
 import { GlassCard, GlassCardTitle } from '@/components/ui/GlassCard';
-import { User, Building2, Bell, Shield, Palette, Database } from 'lucide-react';
+import { User, Building2, Bell, Shield, Palette, Database, Brain } from 'lucide-react';
+import Link from 'next/link';
 
 const settingsSections = [
-  { name: 'Profil', description: 'Zarządzaj swoim kontem i danymi', icon: User },
-  { name: 'Firma', description: 'Dane firmy, logo, dane kontaktowe', icon: Building2 },
-  { name: 'Powiadomienia', description: 'Preferencje powiadomień email i SMS', icon: Bell },
-  { name: 'Bezpieczeństwo', description: 'Hasło, 2FA, aktywne sesje', icon: Shield },
-  { name: 'Wygląd', description: 'Branding, kolory, logo', icon: Palette },
-  { name: 'Moduły', description: 'Aktywne moduły i integracje', icon: Database },
+  { name: 'Profil', description: 'Zarządzaj swoim kontem i danymi', icon: User, href: '#' },
+  { name: 'Firma', description: 'Dane firmy, logo, dane kontaktowe', icon: Building2, href: '#' },
+  { name: 'Powiadomienia', description: 'Preferencje powiadomień email i SMS', icon: Bell, href: '#' },
+  { name: 'Bezpieczeństwo', description: 'Hasło, 2FA, aktywne sesje', icon: Shield, href: '#' },
+  { name: 'Wygląd', description: 'Branding, kolory, logo', icon: Palette, href: '#' },
+  { name: 'Ustawienia AI', description: 'Modele AI, asystent, automatyzacja', icon: Brain, href: '/settings/ai' },
+  { name: 'Moduły', description: 'Aktywne moduły i integracje', icon: Database, href: '#' },
 ];
 
 export default function SettingsPage() {
@@ -23,20 +25,21 @@ export default function SettingsPage() {
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {settingsSections.map((section) => (
-          <GlassCard
-            key={section.name}
-            className="cursor-pointer hover:shadow-xl transition-shadow"
-          >
-            <div className="flex items-start gap-4">
-              <div className="p-3 rounded-xl bg-primary/10">
-                <section.icon className="w-6 h-6 text-primary" />
+          <Link key={section.name} href={section.href}>
+            <GlassCard
+              className="cursor-pointer hover:shadow-xl transition-shadow"
+            >
+              <div className="flex items-start gap-4">
+                <div className="p-3 rounded-xl bg-primary/10">
+                  <section.icon className="w-6 h-6 text-primary" />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-gray-900">{section.name}</h3>
+                  <p className="text-sm text-gray-500 mt-1">{section.description}</p>
+                </div>
               </div>
-              <div>
-                <h3 className="font-semibold text-gray-900">{section.name}</h3>
-                <p className="text-sm text-gray-500 mt-1">{section.description}</p>
-              </div>
-            </div>
-          </GlassCard>
+            </GlassCard>
+          </Link>
         ))}
       </div>
 

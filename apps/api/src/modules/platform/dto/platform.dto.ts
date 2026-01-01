@@ -187,3 +187,48 @@ export class RegisterTenantDto {
   @IsString()
   adminPhone: string;
 }
+
+// Usage Metrics Response Types
+export interface TenantUsageMetrics {
+  tenantId: string;
+  tenantName: string;
+  tenantSlug: string;
+  plan: TenantPlan;
+  status: TenantStatus;
+
+  // Storage
+  storageUsedMB: number;
+  storageLimitMB: number;
+  storageUsedPercent: number;
+
+  // API Calls
+  apiCallsToday: number;
+  apiCallsThisMonth: number;
+  apiCallsLimit: number;
+
+  // Users
+  totalUsers: number;
+  activeUsersLast30Days: number;
+
+  // Activity
+  totalOrders: number;
+  ordersThisMonth: number;
+  totalCustomers: number;
+  totalProducts: number;
+
+  // Timestamps
+  lastActivityAt: Date | null;
+  createdAt: Date;
+
+  // Usage alerts
+  alerts: UsageAlert[];
+}
+
+export interface UsageAlert {
+  type: 'storage' | 'api_calls' | 'users';
+  severity: 'warning' | 'critical';
+  message: string;
+  currentValue: number;
+  limitValue: number;
+  percentage: number;
+}

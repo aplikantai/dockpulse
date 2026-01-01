@@ -26,6 +26,51 @@ export class OpenRouterService {
   private readonly defaultClient: OpenAI;
   private readonly clientCache: Map<string, OpenAI> = new Map();
 
+  // All available models (FREE + PAID)
+  public static readonly AVAILABLE_MODELS = {
+    // FREE MODELS (no credits required)
+    free: {
+      text: [
+        { id: 'google/gemini-2.0-flash-exp:free', name: 'Google Gemini 2.0 Flash', provider: 'Google', tier: 'free' },
+        { id: 'xiaomi/mimo-v2-flash:free', name: 'Xiaomi Mimo v2 Flash', provider: 'Xiaomi', tier: 'free' },
+        { id: 'mistralai/devstral-2512:free', name: 'Mistral Devstral', provider: 'Mistral AI', tier: 'free' },
+        { id: 'qwen/qwen3-coder:free', name: 'Qwen 3 Coder', provider: 'Alibaba', tier: 'free' },
+        { id: 'nvidia/nemotron-3-nano-30b-a3b:free', name: 'Nvidia Nemotron Nano', provider: 'Nvidia', tier: 'free' },
+      ],
+      vision: [
+        { id: 'google/gemini-2.0-flash-exp:free', name: 'Google Gemini 2.0 Flash', provider: 'Google', tier: 'free' },
+        { id: 'xiaomi/mimo-v2-flash:free', name: 'Xiaomi Mimo v2 Flash', provider: 'Xiaomi', tier: 'free' },
+      ],
+      code: [
+        { id: 'mistralai/devstral-2512:free', name: 'Mistral Devstral', provider: 'Mistral AI', tier: 'free' },
+        { id: 'qwen/qwen3-coder:free', name: 'Qwen 3 Coder', provider: 'Alibaba', tier: 'free' },
+      ],
+    },
+    // PAID MODELS (require credits)
+    paid: {
+      text: [
+        { id: 'anthropic/claude-3.5-sonnet', name: 'Claude 3.5 Sonnet', provider: 'Anthropic', tier: 'paid', cost: '$3.00 / 1M tokens' },
+        { id: 'anthropic/claude-3-opus', name: 'Claude 3 Opus', provider: 'Anthropic', tier: 'paid', cost: '$15.00 / 1M tokens' },
+        { id: 'openai/gpt-4o', name: 'GPT-4o', provider: 'OpenAI', tier: 'paid', cost: '$5.00 / 1M tokens' },
+        { id: 'openai/gpt-4-turbo', name: 'GPT-4 Turbo', provider: 'OpenAI', tier: 'paid', cost: '$10.00 / 1M tokens' },
+        { id: 'meta-llama/llama-3.3-70b-instruct', name: 'Llama 3.3 70B', provider: 'Meta', tier: 'paid', cost: '$0.80 / 1M tokens' },
+        { id: 'cohere/command-r-plus', name: 'Command R+', provider: 'Cohere', tier: 'paid', cost: '$3.00 / 1M tokens' },
+        { id: 'mistralai/mistral-large', name: 'Mistral Large', provider: 'Mistral AI', tier: 'paid', cost: '$4.00 / 1M tokens' },
+        { id: 'google/gemini-2.0-flash-thinking', name: 'Gemini 2.0 Flash Thinking', provider: 'Google', tier: 'paid', cost: '$0.50 / 1M tokens' },
+      ],
+      vision: [
+        { id: 'anthropic/claude-3.5-sonnet', name: 'Claude 3.5 Sonnet', provider: 'Anthropic', tier: 'paid', cost: '$3.00 / 1M tokens' },
+        { id: 'openai/gpt-4o', name: 'GPT-4o', provider: 'OpenAI', tier: 'paid', cost: '$5.00 / 1M tokens' },
+        { id: 'google/gemini-2.0-flash-thinking', name: 'Gemini 2.0 Flash Thinking', provider: 'Google', tier: 'paid', cost: '$0.50 / 1M tokens' },
+      ],
+      code: [
+        { id: 'anthropic/claude-3.5-sonnet', name: 'Claude 3.5 Sonnet', provider: 'Anthropic', tier: 'paid', cost: '$3.00 / 1M tokens' },
+        { id: 'openai/gpt-4o', name: 'GPT-4o', provider: 'OpenAI', tier: 'paid', cost: '$5.00 / 1M tokens' },
+        { id: 'mistralai/devstral-2512', name: 'Mistral Devstral (Paid)', provider: 'Mistral AI', tier: 'paid', cost: '$0.20 / 1M tokens' },
+      ],
+    },
+  };
+
   private readonly models: Record<'text' | 'vision' | 'code', ModelConfig> = {
     text: {
       primary: process.env.OPENROUTER_MODEL_TEXT || 'google/gemini-2.0-flash-exp:free',
@@ -53,9 +98,12 @@ export class OpenRouterService {
   };
 
   constructor() {
+    const apiKey = process.env.OPENROUTER_API_KEY || 'sk-or-v1-placeholder';
+    this.logger.log(`OpenRouter API Key configured: ${apiKey.substring(0, 20)}...`);
+
     this.defaultClient = new OpenAI({
       baseURL: process.env.OPENROUTER_BASE_URL || 'https://openrouter.ai/api/v1',
-      apiKey: process.env.OPENROUTER_API_KEY || 'sk-or-v1-placeholder',
+      apiKey: apiKey,
       defaultHeaders: {
         'HTTP-Referer': process.env.FRONTEND_URL || 'https://dockpulse.com',
         'X-Title': 'DockPulse',
@@ -212,6 +260,27 @@ export class OpenRouterService {
    */
   getModelsConfig(): Record<'text' | 'vision' | 'code', ModelConfig> {
     return this.models;
+  }
+
+  /**
+   * Get all available models (for UI selection)
+   */
+  static getAvailableModels() {
+    return OpenRouterService.AVAILABLE_MODELS;
+  }
+
+  /**
+   * Update tenant models configuration
+   */
+  setTenantModels(
+    type: 'text' | 'vision' | 'code',
+    primary: string,
+    fallbacks?: string[],
+  ): void {
+    this.models[type] = {
+      primary,
+      fallbacks: fallbacks || this.models[type].fallbacks,
+    };
   }
 
   /**

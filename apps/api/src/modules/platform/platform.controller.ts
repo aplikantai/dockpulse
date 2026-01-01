@@ -182,6 +182,14 @@ export class PlatformController {
     return this.platformService.getPlatformStats();
   }
 
+  @Get('tenants/:id/usage')
+  @ApiOperation({ summary: 'Usage metrics dla tenanta' })
+  @ApiBearerAuth()
+  @UseGuards(PlatformAdminGuard)
+  async getTenantUsage(@Param('id') id: string) {
+    return this.platformService.getTenantUsage(id);
+  }
+
   // ============ PUBLIC (for onboarding) ============
 
   @Public()

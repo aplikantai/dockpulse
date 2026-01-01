@@ -108,10 +108,6 @@ export class ReportsService {
         return this.prisma.product.findMany({
           where: {
             tenantId,
-            ...(filters.categoryId && { categoryId: filters.categoryId }),
-          },
-          include: {
-            category: true,
           },
           orderBy: { name: 'asc' },
         });

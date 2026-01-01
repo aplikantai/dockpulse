@@ -21,8 +21,24 @@ export class TenantMiddleware implements NestMiddleware {
   constructor(private readonly prisma: PrismaService) {}
 
   async use(req: Request, res: Response, next: NextFunction) {
+    const path = req.path || req.url;
+
+    console.log('[TenantMiddleware] Path:', path, 'URL:', req.url);
+
     // Skip tenant resolution for health checks and public endpoints
-    if (req.path === '/health' || req.path === '/api/health') {
+    if (
+      path === '/health' ||
+      path === '/api/health' ||
+      path === '/api/branding/preview' ||
+      path === '/api/branding/health' ||
+      path === '/api/settings/ai/models' ||
+      path.includes('/branding/preview') ||
+      path.includes('/branding/health') ||
+      path.includes('/platform/tenants/register') ||
+      path.includes('/platform/tenants/check') ||
+      path.includes('/platform/auth/login') ||
+      (path.includes('/api/branding/') && req.method === 'GET')
+    ) {
       return next();
     }
 

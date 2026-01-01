@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service';
 import { MODULES, DEFAULT_MODULES, ORDER_STATUSES, ENTITY_NAMING } from '../../common/constants';
+import { AISettingsDto, TenantAISettings } from './dto/ai-settings.dto';
 
 type TemplateType = 'services' | 'production' | 'trade';
 
@@ -221,5 +222,76 @@ export class SettingsService {
       settings: tenant.settings,
       branding: tenant.branding,
     };
+  }
+
+  // ===========================================
+  // AI SETTINGS
+  // ===========================================
+
+  async getAISettings(tenantId: string): Promise<TenantAISettings> {
+    const tenant = await (this.prisma as any).tenant.findUnique({
+      where: { id: tenantId },
+      select: { settings: true },
+    });
+
+    if (!tenant) {
+      throw new NotFoundException('Tenant not found');
+    }
+
+    const settings = (tenant.settings || {}) as any;
+    const aiSettings = settings.ai || {};
+
+    return {
+      openrouterApiKey: aiSettings.openrouterApiKey || null,
+      models: aiSettings.models || {
+        text: 'google/gemini-2.0-flash-exp:free',
+        vision: 'google/gemini-2.0-flash-exp:free',
+        code: 'mistralai/devstral-2512:free',
+      },
+      enableAIBranding: aiSettings.enableAIBranding ?? true,
+      enableAIAssistant: aiSettings.enableAIAssistant ?? false,
+    };
+  }
+
+  async updateAISettings(
+    tenantId: string,
+    dto: AISettingsDto,
+  ): Promise<TenantAISettings> {
+    const tenant = await (this.prisma as any).tenant.findUnique({
+      where: { id: tenantId },
+      select: { settings: true },
+    });
+
+    if (!tenant) {
+      throw new NotFoundException('Tenant not found');
+    }
+
+    const settings = (tenant.settings || {}) as any;
+    const currentAI = settings.ai || {};
+
+    // Merge new AI settings
+    const updatedAI: TenantAISettings = {
+      openrouterApiKey: dto.openrouterApiKey ?? currentAI.openrouterApiKey,
+      models: {
+        text: dto.models?.textModel ?? currentAI.models?.text ?? 'google/gemini-2.0-flash-exp:free',
+        vision: dto.models?.visionModel ?? currentAI.models?.vision ?? 'google/gemini-2.0-flash-exp:free',
+        code: dto.models?.codeModel ?? currentAI.models?.code ?? 'mistralai/devstral-2512:free',
+      },
+      enableAIBranding: dto.enableAIBranding ?? currentAI.enableAIBranding ?? true,
+      enableAIAssistant: dto.enableAIAssistant ?? currentAI.enableAIAssistant ?? false,
+    };
+
+    // Update tenant settings
+    await (this.prisma as any).tenant.update({
+      where: { id: tenantId },
+      data: {
+        settings: {
+          ...settings,
+          ai: updatedAI,
+        },
+      },
+    });
+
+    return updatedAI;
   }
 }

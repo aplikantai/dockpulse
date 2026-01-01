@@ -20,6 +20,7 @@ import { SettingsService } from './settings.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
+import { Public } from '../auth/decorators/public.decorator';
 import { CurrentUser, CurrentUserData } from '../auth/decorators/current-user.decorator';
 import { UserRole } from '../auth/dto/auth.dto';
 import {
@@ -28,6 +29,8 @@ import {
   ToggleTriggerDto,
   CreateTriggerDto,
 } from './dto/settings.dto';
+import { AISettingsDto } from './dto/ai-settings.dto';
+import { OpenRouterService } from '../branding/services/openrouter.service';
 
 @ApiTags('settings')
 @Controller('settings')
@@ -151,5 +154,35 @@ export class SettingsController {
   @ApiResponse({ status: 200, description: 'Tenant config with statuses, naming, etc.' })
   async getTenantConfig(@CurrentUser() user: CurrentUserData) {
     return this.settingsService.getTenantConfig(user.tenantId);
+  }
+
+  // ===========================================
+  // AI SETTINGS
+  // ===========================================
+
+  @Get('ai')
+  @ApiOperation({ summary: 'Get AI settings for tenant' })
+  @ApiResponse({ status: 200, description: 'AI configuration including models and API keys' })
+  async getAISettings(@CurrentUser() user: CurrentUserData) {
+    return this.settingsService.getAISettings(user.tenantId);
+  }
+
+  @Patch('ai')
+  @Roles(UserRole.ADMIN)
+  @ApiOperation({ summary: 'Update AI settings' })
+  @ApiResponse({ status: 200, description: 'AI settings updated' })
+  async updateAISettings(
+    @CurrentUser() user: CurrentUserData,
+    @Body() dto: AISettingsDto,
+  ) {
+    return this.settingsService.updateAISettings(user.tenantId, dto);
+  }
+
+  @Public()
+  @Get('ai/models')
+  @ApiOperation({ summary: 'Get available AI models' })
+  @ApiResponse({ status: 200, description: 'List of available models (free + paid)' })
+  async getAvailableModels() {
+    return OpenRouterService.getAvailableModels();
   }
 }

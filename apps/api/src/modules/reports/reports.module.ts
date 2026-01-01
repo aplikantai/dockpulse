@@ -3,10 +3,10 @@ import { ReportsController } from './reports.controller';
 import { ReportsService } from './reports.service';
 import { CsvService } from './services/csv.service';
 import { PdfService } from './services/pdf.service';
-import { DatabaseModule } from '../database/prisma.module';
+import { PrismaModule } from '../database/prisma.module';
 
 @Module({
-  imports: [DatabaseModule],
+  imports: [PrismaModule],
   controllers: [ReportsController],
   providers: [ReportsService, CsvService, PdfService],
   exports: [ReportsService, CsvService, PdfService],

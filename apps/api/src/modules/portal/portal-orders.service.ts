@@ -105,7 +105,7 @@ export class PortalOrdersService {
           source: 'portal',
           deliveryAddress: dto.deliveryAddress,
           deliveryDate: dto.deliveryDate,
-        },
+        } as any,
         items: {
           create: orderItems,
         },
