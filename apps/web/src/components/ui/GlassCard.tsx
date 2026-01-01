@@ -8,6 +8,7 @@ interface GlassCardProps {
   accent?: boolean;
   accentColor?: string;
   hover?: boolean;
+  onClick?: () => void;
 }
 
 /**
@@ -20,6 +21,7 @@ export function GlassCard({
   accent = false,
   accentColor,
   hover = true,
+  onClick,
 }: GlassCardProps) {
   const accentStyle = accent
     ? { borderLeft: `4px solid ${accentColor || 'var(--color-accent)'}` }
@@ -39,6 +41,7 @@ export function GlassCard({
         ${className}
       `}
       style={accentStyle}
+      onClick={onClick}
     >
       {children}
     </div>
