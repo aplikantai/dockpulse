@@ -43,9 +43,9 @@ export default function OnboardingPage() {
   };
 
   const steps = [
-    { id: 'branding', label: 'Branding', icon: Palette },
-    { id: 'template', label: 'Szablon', icon: LayoutTemplate },
-    { id: 'modules', label: 'Moduly', icon: Blocks },
+    { id: 'branding', label: 'Dane firmy', icon: Palette },
+    { id: 'template', label: 'Rodzaj działalności', icon: LayoutTemplate },
+    { id: 'modules', label: 'Funkcje', icon: Blocks },
     { id: 'complete', label: 'Gotowe', icon: Rocket },
   ];
 
@@ -58,7 +58,7 @@ export default function OnboardingPage() {
         <div className="text-center mb-8">
           <h1 className="text-3xl font-bold text-gray-900">Konfiguracja DockPulse</h1>
           <p className="text-gray-600 mt-2">
-            Skonfiguruj platforme w kilku prostych krokach
+            Skonfiguruj system w kilku prostych krokach
           </p>
         </div>
 
@@ -170,19 +170,19 @@ function TemplateStep({
       id: 'services',
       name: 'USLUGI',
       description: 'IT, marketing, konsulting',
-      modules: ['@zlecenia', '@klienci', '@wyceny', '@harmonogram'],
+      modules: ['Zlecenia', 'Klienci', 'Wyceny', 'Kalendarz'],
     },
     {
       id: 'production',
       name: 'PRODUKCJA',
       description: 'Przetworstwo, stolarka, meble',
-      modules: ['@zamowienia', '@odbiorcy', '@wyroby', '@magazyn'],
+      modules: ['Zamówienia', 'Odbiorcy', 'Wyroby', 'Magazyn'],
     },
     {
       id: 'trade',
       name: 'HANDEL',
-      description: 'Hurt, dystrybucja, e-commerce B2B',
-      modules: ['@zamowienia', '@kontrahenci', '@towary', '@faktury'],
+      description: 'Hurt, dystrybucja, handel hurtowy',
+      modules: ['Zamówienia', 'Kontrahenci', 'Towary', 'Faktury'],
     },
   ];
 
@@ -194,9 +194,9 @@ function TemplateStep({
         <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-primary/10 mb-4">
           <LayoutTemplate className="w-8 h-8 text-primary" />
         </div>
-        <h2 className="text-2xl font-bold text-gray-900">Wybierz szablon branzowy</h2>
+        <h2 className="text-2xl font-bold text-gray-900">Wybierz rodzaj swojej działalności</h2>
         <p className="mt-2 text-gray-600">
-          Kazdy szablon zawiera predefiniowane moduly, pola i workflow
+          Każdy typ zawiera gotowe funkcje dopasowane do Twojej branży
         </p>
       </div>
 
@@ -255,15 +255,15 @@ function ModulesStep({
         <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-primary/10 mb-4">
           <Blocks className="w-8 h-8 text-primary" />
         </div>
-        <h2 className="text-2xl font-bold text-gray-900">Konfiguruj moduly</h2>
+        <h2 className="text-2xl font-bold text-gray-900">Wybierz potrzebne funkcje</h2>
         <p className="mt-2 text-gray-600">
-          Wlacz lub wylacz moduly zgodnie z potrzebami
+          Włącz lub wyłącz funkcje zgodnie z potrzebami Twojej firmy
         </p>
       </div>
 
       <div className="glass-card p-6">
         <p className="text-center text-gray-500 py-8">
-          Konfiguracja modulow bedzie dostepna w pelnej wersji
+          Konfiguracja funkcji będzie dostępna w pełnej wersji
         </p>
       </div>
 
@@ -272,7 +272,7 @@ function ModulesStep({
           Wstecz
         </button>
         <button onClick={onNext} className="glass-button">
-          Zakoncz konfiguracje
+          Zakończ konfigurację
         </button>
       </div>
     </div>
@@ -287,9 +287,9 @@ function CompleteStep({ brandingData }: { brandingData: BrandingData | null }) {
       </div>
 
       <div>
-        <h2 className="text-2xl font-bold text-gray-900">Konfiguracja zakonczona!</h2>
+        <h2 className="text-2xl font-bold text-gray-900">Konfiguracja zakończona!</h2>
         <p className="mt-2 text-gray-600">
-          Twoja platforma DockPulse jest gotowa do uzycia
+          Twój system DockPulse jest gotowy do użycia
         </p>
       </div>
 
@@ -302,7 +302,7 @@ function CompleteStep({ brandingData }: { brandingData: BrandingData | null }) {
               <span className="font-medium">{brandingData.companyData.name}</span>
             </p>
             <p>
-              <span className="text-gray-500">Kolor glowny:</span>{' '}
+              <span className="text-gray-500">Kolor główny:</span>{' '}
               <span
                 className="inline-block w-4 h-4 rounded ml-2 align-middle"
                 style={{ background: brandingData.branding.colors.primary }}
@@ -314,7 +314,7 @@ function CompleteStep({ brandingData }: { brandingData: BrandingData | null }) {
 
       <div className="pt-4">
         <a href="/dashboard" className="glass-button inline-block">
-          Przejdz do panelu
+          Przejdź do panelu
         </a>
       </div>
     </div>

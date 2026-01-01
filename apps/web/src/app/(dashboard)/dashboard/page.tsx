@@ -189,7 +189,7 @@ export default function DashboardPage() {
   return (
     <>
       <PageHeader
-        title="Dashboard"
+        title="Panel główny"
         description="Przegląd najważniejszych wskaźników"
       />
 

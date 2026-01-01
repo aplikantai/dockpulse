@@ -29,6 +29,7 @@ export class TenantMiddleware implements NestMiddleware {
     if (
       path === '/health' ||
       path === '/api/health' ||
+      path.includes('/api/v1/health') ||
       path === '/api/branding/preview' ||
       path === '/api/branding/health' ||
       path === '/api/settings/ai/models' ||
@@ -37,6 +38,8 @@ export class TenantMiddleware implements NestMiddleware {
       path.includes('/platform/tenants/register') ||
       path.includes('/platform/tenants/check') ||
       path.includes('/platform/auth/login') ||
+      path.includes('/api/docs') || // Swagger
+      path.includes('/api-json') || // Swagger JSON
       (path.includes('/api/branding/') && req.method === 'GET')
     ) {
       return next();
@@ -44,6 +47,13 @@ export class TenantMiddleware implements NestMiddleware {
 
     // Get tenant from header or subdomain
     const tenantSlug = this.extractTenantSlug(req);
+
+    // Skip tenant check for localhost (development mode)
+    const host = req.headers.host || '';
+    if (host.startsWith('localhost') || host.includes(':')) {
+      console.log('[TenantMiddleware] Skipping tenant check for localhost/development');
+      return next();
+    }
 
     if (!tenantSlug) {
       throw new BadRequestException('Missing x-tenant-id header');
@@ -87,8 +97,13 @@ export class TenantMiddleware implements NestMiddleware {
     // Priority 2: Subdomain (e.g., tenant1.dockpulse.app)
     const host = req.headers.host;
     if (host) {
+      // Skip localhost and hosts with ports
+      if (host.startsWith('localhost') || host.includes(':')) {
+        return undefined;
+      }
+
       const subdomain = host.split('.')[0];
-      if (subdomain && subdomain !== 'www' && subdomain !== 'api') {
+      if (subdomain && subdomain !== 'www' && subdomain !== 'api' && subdomain !== 'app' && subdomain !== 'admin') {
         return subdomain;
       }
     }

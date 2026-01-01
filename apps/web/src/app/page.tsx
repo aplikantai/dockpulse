@@ -24,7 +24,7 @@ export default function HomePage() {
 
         <h1 className="text-3xl font-bold text-gray-900 mb-2">DockPulse</h1>
         <p className="text-gray-600 mb-8">
-          Modularna platforma CRM/WMS typu multi-tenant dla malych i srednich firm B2B
+          Prosty system do zarządzania firmą - klienci, zamówienia, magazyn, faktury
         </p>
 
         <div className="space-y-3">

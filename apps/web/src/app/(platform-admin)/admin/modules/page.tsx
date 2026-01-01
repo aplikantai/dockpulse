@@ -16,12 +16,12 @@ interface Module {
 }
 
 const categories = [
-  'All',
-  'Operations',
-  'Finance',
-  'Vessels',
-  'Port Services',
-  'Analytics',
+  'Wszystkie',
+  'Operacje',
+  'Finanse',
+  'Statki',
+  'Usługi portowe',
+  'Analizy',
 ];
 
 export default function ModulesPage() {
@@ -60,8 +60,17 @@ export default function ModulesPage() {
       module.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       module.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
       module.code.toLowerCase().includes(searchTerm.toLowerCase());
+    const categoryMapping: Record<string, string> = {
+      'Wszystkie': 'All',
+      'Operacje': 'Operations',
+      'Finanse': 'Finance',
+      'Statki': 'Vessels',
+      'Usługi portowe': 'Port Services',
+      'Analizy': 'Analytics',
+    };
+    const englishCategory = categoryMapping[selectedCategory] || selectedCategory;
     const matchesCategory =
-      selectedCategory === 'All' || module.category === selectedCategory;
+      selectedCategory === 'Wszystkie' || module.category === englishCategory;
     return matchesSearch && matchesCategory;
   });
 
@@ -73,6 +82,12 @@ export default function ModulesPage() {
       'Port Services': '⚓',
       Analytics: '📊',
       All: '🧩',
+      'Wszystkie': '🧩',
+      'Operacje': '⚙️',
+      'Finanse': '💰',
+      'Statki': '🚢',
+      'Usługi portowe': '⚓',
+      'Analizy': '📊',
     };
     return icons[category] || '📦';
   };
@@ -107,13 +122,13 @@ export default function ModulesPage() {
   if (error) {
     return (
       <GlassCard className="text-center py-12">
-        <div className="text-red-600 text-lg mb-2">Error Loading Modules</div>
+        <div className="text-red-600 text-lg mb-2">Błąd wczytywania modułów</div>
         <p className="text-gray-600 mb-4">{error}</p>
         <button
           onClick={fetchModules}
           className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
         >
-          Retry
+          Spróbuj ponownie
         </button>
       </GlassCard>
     );
@@ -123,9 +138,9 @@ export default function ModulesPage() {
     <div className="space-y-6">
       {/* Header */}
       <div>
-        <h1 className="text-3xl font-bold text-gray-900">Module Catalog</h1>
+        <h1 className="text-3xl font-bold text-gray-900">Katalog modułów</h1>
         <p className="text-gray-600 mt-2">
-          Browse and manage available modules for your tenants
+          Przeglądaj i zarządzaj dostępnymi modułami dla najemców
         </p>
       </div>
 
@@ -134,7 +149,7 @@ export default function ModulesPage() {
         <div className="flex-1">
           <input
             type="text"
-            placeholder="Search modules..."
+            placeholder="Szukaj modułów..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -166,25 +181,25 @@ export default function ModulesPage() {
       {/* Stats */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <div className="bg-white rounded-xl p-4 border border-gray-200">
-          <div className="text-sm text-gray-600">Total Modules</div>
+          <div className="text-sm text-gray-600">Wszystkie moduły</div>
           <div className="text-2xl font-bold text-gray-900 mt-1">
             {modules.length}
           </div>
         </div>
         <div className="bg-white rounded-xl p-4 border border-gray-200">
-          <div className="text-sm text-gray-600">Categories</div>
+          <div className="text-sm text-gray-600">Kategorie</div>
           <div className="text-2xl font-bold text-gray-900 mt-1">
             {new Set(modules.map((m) => m.category)).size}
           </div>
         </div>
         <div className="bg-white rounded-xl p-4 border border-gray-200">
-          <div className="text-sm text-gray-600">Total Installations</div>
+          <div className="text-sm text-gray-600">Instalacje ogółem</div>
           <div className="text-2xl font-bold text-gray-900 mt-1">
             {modules.reduce((sum, m) => sum + (m.installCount || 0), 0)}
           </div>
         </div>
         <div className="bg-white rounded-xl p-4 border border-gray-200">
-          <div className="text-sm text-gray-600">Showing</div>
+          <div className="text-sm text-gray-600">Wyświetlane</div>
           <div className="text-2xl font-bold text-gray-900 mt-1">
             {filteredModules.length}
           </div>
@@ -226,14 +241,14 @@ export default function ModulesPage() {
                   <span>{module.installCount || 0} installations</span>
                 </div>
                 <button className="text-blue-600 hover:text-blue-700 text-sm font-medium group-hover:underline">
-                  View Details →
+                  Zobacz szczegóły →
                 </button>
               </div>
             </GlassCard>
           ))
         ) : (
           <div className="col-span-full text-center py-12 text-gray-500">
-            No modules match your filters
+            Brak modułów pasujących do wybranych filtrów
           </div>
         )}
       </div>
@@ -302,7 +317,7 @@ function ModuleDetailModal({
           {/* Description */}
           <div>
             <h3 className="text-lg font-semibold text-gray-900 mb-2">
-              Description
+              Opis
             </h3>
             <p className="text-gray-700">{module.description}</p>
           </div>
@@ -310,13 +325,13 @@ function ModuleDetailModal({
           {/* Category & Stats */}
           <div className="grid grid-cols-2 gap-4">
             <div className="bg-gray-50 rounded-xl p-4">
-              <div className="text-sm text-gray-600 mb-1">Category</div>
+              <div className="text-sm text-gray-600 mb-1">Kategoria</div>
               <div className="font-semibold text-gray-900">{module.category}</div>
             </div>
             <div className="bg-gray-50 rounded-xl p-4">
-              <div className="text-sm text-gray-600 mb-1">Installations</div>
+              <div className="text-sm text-gray-600 mb-1">Instalacje</div>
               <div className="font-semibold text-gray-900">
-                {module.installCount || 0} tenants
+                {module.installCount || 0} najemców
               </div>
             </div>
           </div>
@@ -325,7 +340,7 @@ function ModuleDetailModal({
           {module.features && module.features.length > 0 && (
             <div>
               <h3 className="text-lg font-semibold text-gray-900 mb-3">
-                Features
+                Funkcje
               </h3>
               <ul className="space-y-2">
                 {module.features.map((feature, index) => (
@@ -342,7 +357,7 @@ function ModuleDetailModal({
           {module.dependencies && module.dependencies.length > 0 && (
             <div>
               <h3 className="text-lg font-semibold text-gray-900 mb-3">
-                Dependencies
+                Zależności
               </h3>
               <div className="flex flex-wrap gap-2">
                 {module.dependencies.map((dep, index) => (
@@ -360,23 +375,23 @@ function ModuleDetailModal({
           {/* Technical Details */}
           <div>
             <h3 className="text-lg font-semibold text-gray-900 mb-3">
-              Technical Details
+              Szczegóły techniczne
             </h3>
             <div className="bg-gray-50 rounded-xl p-4 space-y-2 font-mono text-sm">
               <div className="flex justify-between">
-                <span className="text-gray-600">Module Code:</span>
+                <span className="text-gray-600">Kod modułu:</span>
                 <span className="text-gray-900 font-semibold">
                   {module.code}
                 </span>
               </div>
               <div className="flex justify-between">
-                <span className="text-gray-600">Version:</span>
+                <span className="text-gray-600">Wersja:</span>
                 <span className="text-gray-900 font-semibold">
                   {module.version}
                 </span>
               </div>
               <div className="flex justify-between">
-                <span className="text-gray-600">Category:</span>
+                <span className="text-gray-600">Kategoria:</span>
                 <span className="text-gray-900 font-semibold">
                   {module.category}
                 </span>
@@ -392,10 +407,10 @@ function ModuleDetailModal({
               onClick={onClose}
               className="flex-1 px-6 py-3 border border-gray-200 rounded-xl hover:bg-gray-50 transition-all font-medium"
             >
-              Close
+              Zamknij
             </button>
             <button className="flex-1 px-6 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-all font-medium">
-              Install to Tenant
+              Zainstaluj dla najemcy
             </button>
           </div>
         </div>

@@ -27,7 +27,7 @@ interface NavItem {
 }
 
 const mainNavItems: NavItem[] = [
-  { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
+  { name: 'Panel główny', href: '/dashboard', icon: LayoutDashboard },
   { name: 'Klienci', href: '/customers', icon: Users },
   { name: 'Produkty', href: '/products', icon: Package },
   { name: 'Zamówienia', href: '/orders', icon: ShoppingCart, badge: 3 },
