@@ -21,6 +21,7 @@ import { HealthController } from './health.controller';
 import { EventsModule } from './modules/events/events.module';
 import { DataBusModule } from './modules/data-bus/data-bus.module';
 import { ModuleRegistryModule } from './modules/module-registry/module-registry.module';
+import { StockModule } from './modules/stock/stock.module';
 
 @Module({
   imports: [
@@ -57,6 +58,7 @@ import { ModuleRegistryModule } from './modules/module-registry/module-registry.
     QuotesModule,
     ProductsModule,
     SettingsModule,
+    StockModule, // @stock module - extends Product entity
   ],
   controllers: [HealthController],
   providers: [
