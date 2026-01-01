@@ -305,7 +305,7 @@ export class BrandingService {
         accent: isValidHex(colors.accent) ? colors.accent : '#70AD47',
       };
     } catch (error) {
-      this.logger.error(`Color extraction failed: ${error.message}`);
+      this.logger.warn(`Color extraction failed (using defaults): ${error.message}`);
       return this.getDefaultColors();
     }
   }
@@ -314,7 +314,25 @@ export class BrandingService {
    * Convert image URL to base64 (with SSRF protection)
    */
   private async imageToBase64(url: string): Promise<string> {
-    // SSRF Protection
+    // Handle data URIs (commonly used for embedded logos)
+    if (url.startsWith('data:')) {
+      const match = url.match(/^data:([^;]+);base64,(.+)$/);
+      if (match) {
+        // Already base64 encoded
+        return match[2];
+      }
+
+      // Handle URL-encoded data URIs
+      const urlEncodedMatch = url.match(/^data:([^,]+),(.+)$/);
+      if (urlEncodedMatch) {
+        const decodedData = decodeURIComponent(urlEncodedMatch[2]);
+        return Buffer.from(decodedData).toString('base64');
+      }
+
+      throw new Error('Invalid data URI format');
+    }
+
+    // SSRF Protection for HTTP/HTTPS URLs
     await this.validateUrlSecurity(url);
 
     const response = await axios.get(url, {

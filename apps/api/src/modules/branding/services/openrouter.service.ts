@@ -84,7 +84,8 @@ export class OpenRouterService {
     vision: {
       primary: process.env.OPENROUTER_MODEL_VISION || 'google/gemini-2.0-flash-exp:free',
       fallbacks: [
-        'xiaomi/mimo-v2-flash:free',
+        // No working free vision fallbacks currently available
+        // 'xiaomi/mimo-v2-flash:free' - doesn't support image input
       ],
     },
     code: {
