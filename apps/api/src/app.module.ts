@@ -23,6 +23,7 @@ import { DataBusModule } from './modules/data-bus/data-bus.module';
 import { ModuleRegistryModule } from './modules/module-registry/module-registry.module';
 import { StockModule } from './modules/stock/stock.module';
 import { CalendarModule } from './modules/calendar/calendar.module';
+import { InvoicingModule } from './modules/invoicing/invoicing.module';
 import { AdminModule } from './modules/admin/admin.module';
 
 @Module({
@@ -62,6 +63,7 @@ import { AdminModule } from './modules/admin/admin.module';
     SettingsModule,
     StockModule, // @stock module - extends Product entity
     CalendarModule, // @calendar module - extends Customer and Order entities
+    InvoicingModule, // @invoicing module - extends Order and Customer entities
     AdminModule, // Platform Admin Panel
   ],
   controllers: [HealthController],

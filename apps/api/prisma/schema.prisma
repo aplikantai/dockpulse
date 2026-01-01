@@ -20,15 +20,15 @@ model Tenant {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  users           User[]
-  customers       Customer[]
-  orders          Order[]
-  quotes          Quote[]
-  products        Product[]
-  modules         TenantModule[]
-  fieldConfigs    FieldConfig[]
-  triggers        WorkflowTrigger[]
-  eventLogs       EventLog[]
+  users        User[]
+  customers    Customer[]
+  orders       Order[]
+  quotes       Quote[]
+  products     Product[]
+  modules      TenantModule[]
+  fieldConfigs FieldConfig[]
+  triggers     WorkflowTrigger[]
+  eventLogs    EventLog[]
 
   @@map("tenants")
 }
@@ -38,14 +38,14 @@ model Tenant {
 // ===========================================
 
 model TenantModule {
-  id          String   @id @default(uuid())
-  tenantId    String
-  tenant      Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  moduleCode  String   // '@customers' | '@orders' | '@products' | '@quotes' | '@stock' | '@calendar' | etc.
-  isEnabled   Boolean  @default(true)
-  config      Json     @default("{}")
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id         String   @id @default(uuid())
+  tenantId   String
+  tenant     Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  moduleCode String // '@customers' | '@orders' | '@products' | '@quotes' | '@stock' | '@calendar' | etc.
+  isEnabled  Boolean  @default(true)
+  config     Json     @default("{}")
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 
   @@unique([tenantId, moduleCode])
   @@index([tenantId])
@@ -60,12 +60,12 @@ model FieldConfig {
   id           String   @id @default(uuid())
   tenantId     String
   tenant       Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  entityType   String   // 'customer' | 'order' | 'product' | 'quote'
-  fieldName    String   // e.g., 'phone', 'nip', 'deliveryAddress'
+  entityType   String // 'customer' | 'order' | 'product' | 'quote'
+  fieldName    String // e.g., 'phone', 'nip', 'deliveryAddress'
   isVisible    Boolean  @default(true)
   isRequired   Boolean  @default(false)
   displayOrder Int      @default(0)
-  label        String?  // Custom label override
+  label        String? // Custom label override
   config       Json     @default("{}")
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
@@ -81,20 +81,20 @@ model FieldConfig {
 // ===========================================
 
 model WorkflowTrigger {
-  id          String   @id @default(uuid())
-  tenantId    String
-  tenant      Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  code        String   // e.g., 'order.new.sms_admin'
-  name        String   // Human-readable name
-  eventType   String   // 'order.created' | 'order.status_changed' | 'customer.created' | etc.
-  actionType  String   // 'sms' | 'email' | 'webhook' | 'create_entity'
-  actionConfig Json    @default("{}") // Template, recipient config, etc.
-  conditions  Json     @default("{}") // When to trigger (status = 'ready', etc.)
-  isEnabled   Boolean  @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id           String   @id @default(uuid())
+  tenantId     String
+  tenant       Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  code         String // e.g., 'order.new.sms_admin'
+  name         String // Human-readable name
+  eventType    String // 'order.created' | 'order.status_changed' | 'customer.created' | etc.
+  actionType   String // 'sms' | 'email' | 'webhook' | 'create_entity'
+  actionConfig Json     @default("{}") // Template, recipient config, etc.
+  conditions   Json     @default("{}") // When to trigger (status = 'ready', etc.)
+  isEnabled    Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
-  executions  WorkflowExecution[]
+  executions WorkflowExecution[]
 
   @@unique([tenantId, code])
   @@index([tenantId])
@@ -108,16 +108,16 @@ model WorkflowTrigger {
 // ===========================================
 
 model EventLog {
-  id          String   @id @default(uuid())
-  tenantId    String
-  tenant      Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  eventType   String   // 'order.created', 'order.status_changed', etc.
-  entityType  String   // 'order', 'customer', 'product', 'quote'
-  entityId    String
-  userId      String?
-  payload     Json     @default("{}")
-  metadata    Json?    // Event metadata (version, correlationId, etc.)
-  createdAt   DateTime @default(now())
+  id         String   @id @default(uuid())
+  tenantId   String
+  tenant     Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  eventType  String // 'order.created', 'order.status_changed', etc.
+  entityType String // 'order', 'customer', 'product', 'quote'
+  entityId   String
+  userId     String?
+  payload    Json     @default("{}")
+  metadata   Json? // Event metadata (version, correlationId, etc.)
+  createdAt  DateTime @default(now())
 
   @@index([tenantId])
   @@index([eventType])
@@ -138,29 +138,29 @@ model User {
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
 
-  orders    Order[]
-  quotes    Quote[]
+  orders Order[]
+  quotes Quote[]
 
   @@index([tenantId])
   @@map("users")
 }
 
 model Customer {
-  id          String   @id @default(uuid())
-  tenantId    String
-  tenant      Tenant   @relation(fields: [tenantId], references: [id])
-  name        String
-  email       String?
-  phone       String?
-  company     String?
-  address     Json?
-  notes       String?
-  tags        String[]
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id        String   @id @default(uuid())
+  tenantId  String
+  tenant    Tenant   @relation(fields: [tenantId], references: [id])
+  name      String
+  email     String?
+  phone     String?
+  company   String?
+  address   Json?
+  notes     String?
+  tags      String[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  orders      Order[]
-  quotes      Quote[]
+  orders Order[]
+  quotes Quote[]
 
   @@index([tenantId])
   @@index([email])
@@ -183,8 +183,8 @@ model Product {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  orderItems  OrderItem[]
-  quoteItems  QuoteItem[]
+  orderItems OrderItem[]
+  quoteItems QuoteItem[]
 
   @@unique([tenantId, sku])
   @@index([tenantId])
@@ -192,24 +192,24 @@ model Product {
 }
 
 model Order {
-  id          String      @id @default(uuid())
+  id          String   @id @default(uuid())
   tenantId    String
-  tenant      Tenant      @relation(fields: [tenantId], references: [id])
+  tenant      Tenant   @relation(fields: [tenantId], references: [id])
   orderNumber String
   customerId  String
-  customer    Customer    @relation(fields: [customerId], references: [id])
+  customer    Customer @relation(fields: [customerId], references: [id])
   userId      String?
-  user        User?       @relation(fields: [userId], references: [id])
-  status      String      @default("new")
-  totalNet    Decimal     @db.Decimal(10, 2)
-  totalGross  Decimal     @db.Decimal(10, 2)
-  vatRate     Decimal     @default(23) @db.Decimal(5, 2)
+  user        User?    @relation(fields: [userId], references: [id])
+  status      String   @default("new")
+  totalNet    Decimal  @db.Decimal(10, 2)
+  totalGross  Decimal  @db.Decimal(10, 2)
+  vatRate     Decimal  @default(23) @db.Decimal(5, 2)
   notes       String?
   metadata    Json?
-  createdAt   DateTime    @default(now())
-  updatedAt   DateTime    @updatedAt
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
-  items       OrderItem[]
+  items OrderItem[]
 
   @@unique([tenantId, orderNumber])
   @@index([tenantId])
@@ -219,39 +219,39 @@ model Order {
 }
 
 model OrderItem {
-  id          String   @id @default(uuid())
-  orderId     String
-  order       Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  productId   String
-  product     Product  @relation(fields: [productId], references: [id])
-  quantity    Int
-  unitPrice   Decimal  @db.Decimal(10, 2)
-  totalPrice  Decimal  @db.Decimal(10, 2)
+  id         String  @id @default(uuid())
+  orderId    String
+  order      Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productId  String
+  product    Product @relation(fields: [productId], references: [id])
+  quantity   Int
+  unitPrice  Decimal @db.Decimal(10, 2)
+  totalPrice Decimal @db.Decimal(10, 2)
 
   @@index([orderId])
   @@map("order_items")
 }
 
 model Quote {
-  id          String      @id @default(uuid())
+  id          String    @id @default(uuid())
   tenantId    String
-  tenant      Tenant      @relation(fields: [tenantId], references: [id])
+  tenant      Tenant    @relation(fields: [tenantId], references: [id])
   quoteNumber String
   customerId  String
-  customer    Customer    @relation(fields: [customerId], references: [id])
+  customer    Customer  @relation(fields: [customerId], references: [id])
   userId      String?
-  user        User?       @relation(fields: [userId], references: [id])
-  status      String      @default("draft")
+  user        User?     @relation(fields: [userId], references: [id])
+  status      String    @default("draft")
   validUntil  DateTime?
-  totalNet    Decimal     @db.Decimal(10, 2)
-  totalGross  Decimal     @db.Decimal(10, 2)
-  vatRate     Decimal     @default(23) @db.Decimal(5, 2)
+  totalNet    Decimal   @db.Decimal(10, 2)
+  totalGross  Decimal   @db.Decimal(10, 2)
+  vatRate     Decimal   @default(23) @db.Decimal(5, 2)
   notes       String?
   metadata    Json?
-  createdAt   DateTime    @default(now())
-  updatedAt   DateTime    @updatedAt
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 
-  items       QuoteItem[]
+  items QuoteItem[]
 
   @@unique([tenantId, quoteNumber])
   @@index([tenantId])
@@ -261,14 +261,14 @@ model Quote {
 }
 
 model QuoteItem {
-  id          String   @id @default(uuid())
-  quoteId     String
-  quote       Quote    @relation(fields: [quoteId], references: [id], onDelete: Cascade)
-  productId   String
-  product     Product  @relation(fields: [productId], references: [id])
-  quantity    Int
-  unitPrice   Decimal  @db.Decimal(10, 2)
-  totalPrice  Decimal  @db.Decimal(10, 2)
+  id         String  @id @default(uuid())
+  quoteId    String
+  quote      Quote   @relation(fields: [quoteId], references: [id], onDelete: Cascade)
+  productId  String
+  product    Product @relation(fields: [productId], references: [id])
+  quantity   Int
+  unitPrice  Decimal @db.Decimal(10, 2)
+  totalPrice Decimal @db.Decimal(10, 2)
 
   @@index([quoteId])
   @@map("quote_items")
@@ -279,16 +279,16 @@ model QuoteItem {
 // ===========================================
 
 model ApiKey {
-  id          String   @id @default(uuid())
-  tenantId    String
-  name        String   // Company name / key name
-  service     String   // 'openrouter' | 'openai' | 'anthropic' | etc.
-  apiKey      String   // Encrypted API key
-  isActive    Boolean  @default(true)
-  usageCount  Int      @default(0)
-  lastUsedAt  DateTime?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id         String    @id @default(uuid())
+  tenantId   String
+  name       String // Company name / key name
+  service    String // 'openrouter' | 'openai' | 'anthropic' | etc.
+  apiKey     String // Encrypted API key
+  isActive   Boolean   @default(true)
+  usageCount Int       @default(0)
+  lastUsedAt DateTime?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
 
   @@unique([tenantId, service])
   @@index([tenantId])
@@ -301,15 +301,15 @@ model ApiKey {
 // ===========================================
 
 model WorkflowExecution {
-  id          String    @id @default(uuid())
-  triggerId   String
-  trigger     WorkflowTrigger @relation(fields: [triggerId], references: [id], onDelete: Cascade)
-  tenantId    String
-  eventId     String    // Reference to EventLog
-  status      String    // 'SUCCESS' | 'FAILED' | 'PENDING'
-  error       String?   // Error message if failed
-  result      Json?     // Execution result
-  executedAt  DateTime  @default(now())
+  id         String          @id @default(uuid())
+  triggerId  String
+  trigger    WorkflowTrigger @relation(fields: [triggerId], references: [id], onDelete: Cascade)
+  tenantId   String
+  eventId    String // Reference to EventLog
+  status     String // 'SUCCESS' | 'FAILED' | 'PENDING'
+  error      String? // Error message if failed
+  result     Json? // Execution result
+  executedAt DateTime        @default(now())
 
   @@index([triggerId])
   @@index([tenantId])
