@@ -244,6 +244,13 @@ export default function HomePage() {
                       src={preview.branding.logoUrl}
                       alt="Logo"
                       className="max-h-20 w-auto object-contain"
+                      onError={(e) => {
+                        // Fallback: try favicon if logo fails
+                        const target = e.target as HTMLImageElement;
+                        if (preview.branding.faviconUrl && target.src !== preview.branding.faviconUrl) {
+                          target.src = preview.branding.faviconUrl;
+                        }
+                      }}
                     />
                   </div>
                 </div>
