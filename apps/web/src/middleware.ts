@@ -2,14 +2,27 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
 export function middleware(request: NextRequest) {
-  // Only process API requests that will be rewritten to the backend
-  if (request.nextUrl.pathname.startsWith('/api/')) {
-    // Extract tenant slug from hostname (subdomain)
-    const hostname = request.headers.get('host') || '';
-    const subdomain = hostname.split('.')[0];
+  const hostname = request.headers.get('host') || '';
+  const subdomain = hostname.split('.')[0];
+  const pathname = request.nextUrl.pathname;
 
+  // Redirect subdomains to their proper sections
+  if (pathname === '/') {
+    if (hostname.includes('app.dockpulse.com')) {
+      // app.dockpulse.com → redirect to /dashboard
+      return NextResponse.redirect(new URL('/dashboard', request.url));
+    }
+    if (hostname.includes('admin.dockpulse.com')) {
+      // admin.dockpulse.com → redirect to /admin
+      return NextResponse.redirect(new URL('/admin', request.url));
+    }
+    // dockpulse.com and www.dockpulse.com → show landing page (no redirect)
+  }
+
+  // Process API requests - add tenant header
+  if (pathname.startsWith('/api/')) {
     // Skip for localhost and main domains
-    if (subdomain && subdomain !== 'localhost' && subdomain !== 'app' && subdomain !== 'www') {
+    if (subdomain && subdomain !== 'localhost' && subdomain !== 'app' && subdomain !== 'www' && subdomain !== 'admin') {
       // Create new headers with x-tenant-id
       const requestHeaders = new Headers(request.headers);
       requestHeaders.set('x-tenant-id', subdomain);
@@ -28,5 +41,5 @@ export function middleware(request: NextRequest) {
 
 // Configure which routes to run middleware on
 export const config = {
-  matcher: '/api/:path*',
+  matcher: ['/', '/api/:path*'],
 };
