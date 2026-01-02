@@ -13,9 +13,10 @@ export interface DominantColors {
  */
 export async function extractColorsFromImage(imageUrl: string): Promise<DominantColors> {
   try {
-    // Skip SVG files (sharp doesn't support SVG well)
-    if (imageUrl.toLowerCase().endsWith('.svg')) {
-      throw new Error('SVG format not supported for color extraction');
+    // Skip unsupported formats
+    const url = imageUrl.toLowerCase();
+    if (url.endsWith('.svg') || url.endsWith('.ico')) {
+      throw new Error(`Format not supported: ${url.split('.').pop()}`);
     }
 
     // Download image
@@ -25,14 +26,21 @@ export async function extractColorsFromImage(imageUrl: string): Promise<Dominant
       maxContentLength: 5 * 1024 * 1024, // 5MB max
       headers: {
         'User-Agent': 'Mozilla/5.0 (compatible; DockPulse/1.0)',
+        'Accept': 'image/png,image/jpeg,image/webp,image/*',
       },
     });
 
-    // Resize to small size for faster processing
-    const imageBuffer = await sharp(Buffer.from(response.data))
-      .resize(100, 100, { fit: 'inside' })
-      .raw()
-      .toBuffer({ resolveWithObject: true });
+    // Convert to PNG first (handles various formats)
+    let imageBuffer;
+    try {
+      imageBuffer = await sharp(Buffer.from(response.data))
+        .resize(100, 100, { fit: 'inside' })
+        .png() // Convert to PNG first
+        .raw()
+        .toBuffer({ resolveWithObject: true });
+    } catch (sharpError) {
+      throw new Error(`Image processing failed: ${sharpError.message}`);
+    }
 
     const { data, info } = imageBuffer;
     const pixels: number[][] = [];
