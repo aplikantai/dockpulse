@@ -39,7 +39,7 @@ export default function ModulesPage() {
   const fetchModules = async () => {
     try {
       setLoading(true);
-      const response = await fetch('http://localhost:3003/api/admin/modules');
+      const response = await fetch('/api/admin/modules');
 
       if (!response.ok) {
         throw new Error('Failed to fetch modules');

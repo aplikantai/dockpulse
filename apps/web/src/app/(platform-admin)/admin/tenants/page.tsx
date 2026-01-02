@@ -31,7 +31,7 @@ export default function TenantsPage() {
   const fetchTenants = async () => {
     try {
       setLoading(true);
-      const response = await fetch('http://localhost:3003/api/admin/tenants');
+      const response = await fetch('/api/admin/tenants');
 
       if (!response.ok) {
         throw new Error('Failed to fetch tenants');
@@ -314,7 +314,7 @@ function CreateTenantModal({
     setError(null);
 
     try {
-      const response = await fetch('http://localhost:3003/api/admin/tenants', {
+      const response = await fetch('/api/admin/tenants', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(formData),

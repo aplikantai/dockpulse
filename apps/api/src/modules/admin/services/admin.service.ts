@@ -1,6 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
-import { ModuleRegistryService } from '../../module-registry/module-registry.service';
 import {
   PlatformStatsDto,
   TenantListDto,
@@ -8,6 +7,12 @@ import {
   ModuleCatalogItemDto,
   CreateTenantDto,
 } from '../dto/platform-stats.dto';
+import {
+  MODULE_REGISTRY,
+  getAllModules,
+  getModuleByCode,
+  ModuleCode,
+} from '../../platform/module-registry';
 
 /**
  * AdminService - Business logic for Platform Admin Panel
@@ -18,7 +23,6 @@ export class AdminService {
 
   constructor(
     private readonly prisma: PrismaService,
-    private readonly moduleRegistry: ModuleRegistryService,
   ) {}
 
   /**
@@ -31,18 +35,30 @@ export class AdminService {
     const allTenants = await this.prisma.tenant.findMany({
       include: {
         users: true,
+        modules: true,
       },
+      orderBy: { createdAt: 'desc' },
     });
 
     const totalTenants = allTenants.length;
+
+    // Active tenants = has users who logged in within last 30 days
     const activeTenants = allTenants.filter(t => {
-      // Active = has users who logged in within last 30 days
       return t.users.some(u => {
         if (!u.lastLogin) return false;
         const daysSinceLogin = (Date.now() - u.lastLogin.getTime()) / (1000 * 60 * 60 * 24);
         return daysSinceLogin <= 30;
       });
     }).length;
+
+    // Trial tenants = created within last 14 days (mock for now - TODO: add trial field)
+    const trialTenants = allTenants.filter(t => {
+      const daysSinceCreation = (Date.now() - t.createdAt.getTime()) / (1000 * 60 * 60 * 24);
+      return daysSinceCreation <= 14;
+    }).length;
+
+    // Suspended tenants (mock - TODO: add status field)
+    const suspendedTenants = 0;
 
     const tenantsByPlan: { [key: string]: number } = {};
     allTenants.forEach(t => {
@@ -51,7 +67,7 @@ export class AdminService {
     });
 
     // Modules stats
-    const allModules = this.moduleRegistry.getAllModules();
+    const allModules = getAllModules();
     const moduleInstallations: { [code: string]: number } = {};
 
     // Count installations from TenantModule table
@@ -104,21 +120,76 @@ export class AdminService {
       this.prisma.eventLog.count({ where: { createdAt: { gte: last30d } } }),
     ]);
 
+    // Calculate MRR and ARR (mock for now - TODO: integrate with real billing)
+    const modulesByCode = allModules.reduce((acc, mod) => {
+      acc[mod.code] = mod;
+      return acc;
+    }, {} as Record<string, any>);
+
+    let totalMRR = 0;
+    allTenants.forEach(t => {
+      t.modules.forEach(tm => {
+        if (tm.isEnabled) {
+          const moduleDef = modulesByCode[tm.moduleCode];
+          if (moduleDef && moduleDef.price) {
+            totalMRR += moduleDef.price;
+          }
+        }
+      });
+    });
+
+    const totalARR = totalMRR * 12;
+    const revenueGrowth = 15.5; // Mock - TODO: calculate real growth
+
+    // Get top modules with installation counts
+    const topModules = Object.entries(modulesByModule)
+      .sort((a, b) => b[1].installations - a[1].installations)
+      .slice(0, 5)
+      .map(([code, data]) => ({
+        code,
+        name: data.name,
+        installations: data.installations,
+      }));
+
+    // Get recent tenants
+    const recentTenants = allTenants.slice(0, 5).map(t => ({
+      id: t.id,
+      name: t.name,
+      slug: t.slug,
+      createdAt: t.createdAt.toISOString(),
+      plan: 'FREE', // TODO: Add real plan
+    }));
+
+    // Calculate issues
+    const expiredTrials = allTenants.filter(t => {
+      const daysSinceCreation = (Date.now() - t.createdAt.getTime()) / (1000 * 60 * 60 * 24);
+      return daysSinceCreation > 14 && daysSinceCreation <= 16; // Trial expired 0-2 days ago
+    }).length;
+
     return {
       tenants: {
         total: totalTenants,
         active: activeTenants,
+        trial: trialTenants,
+        suspended: suspendedTenants,
         inactive: totalTenants - activeTenants,
         byPlan: tenantsByPlan,
       },
-      modules: {
-        total: allModules.length,
-        installed: totalInstallations,
-        byModule: modulesByModule,
-      },
+      modules: topModules,
       users: {
         total: totalUsers,
         active: activeUsers,
+      },
+      revenue: {
+        mrr: totalMRR,
+        arr: totalARR,
+        growth: revenueGrowth,
+      },
+      recentTenants,
+      issues: {
+        suspendedTenants,
+        failedPayments: 0, // TODO: Add real billing data
+        expiredTrials,
       },
       storage: {
         totalUsed: 0, // TODO: Calculate total
@@ -184,11 +255,11 @@ export class AdminService {
 
     // Map installed modules with details from registry
     const installedModules = tenant.modules.map(tm => {
-      const moduleDef = this.moduleRegistry.getModule(tm.moduleCode);
+      const moduleDef = getModuleByCode(tm.moduleCode as ModuleCode);
       return {
         code: tm.moduleCode,
-        name: moduleDef?.name || tm.moduleCode,
-        version: moduleDef?.version || '1.0.0',
+        name: moduleDef?.namePl || moduleDef?.name || tm.moduleCode,
+        version: '1.0.0',
         enabled: tm.isEnabled,
         installedAt: tm.createdAt,
       };
@@ -224,7 +295,7 @@ export class AdminService {
    * Get module catalog
    */
   async getModuleCatalog(): Promise<ModuleCatalogItemDto[]> {
-    const allModules = this.moduleRegistry.getAllModules();
+    const allModules = getAllModules();
 
     // Get installation counts
     const installationCounts = await this.prisma.tenantModule.groupBy({
@@ -241,18 +312,18 @@ export class AdminService {
 
     return allModules.map(mod => ({
       code: mod.code,
-      name: mod.name,
-      description: mod.description,
-      version: mod.version,
+      name: mod.namePl || mod.name,
+      description: mod.descriptionPl || mod.description,
+      version: '1.0.0',
       category: mod.category,
-      author: mod.author,
-      minPlan: mod.minPlan,
-      dependencies: mod.dependencies,
+      author: 'DockPulse',
+      minPlan: mod.price ? 'STARTER' : 'FREE',
+      dependencies: mod.dependencies?.map(d => d.toString()) || [],
       installations: installCountMap[mod.code] || 0,
       features: mod.features.map(f => ({
-        code: f.code,
-        name: f.name,
-        description: f.description,
+        code: f,
+        name: f,
+        description: f,
       })),
     }));
   }
@@ -317,7 +388,30 @@ export class AdminService {
   async installModuleForTenant(tenantId: string, moduleCode: string): Promise<void> {
     this.logger.log(`Platform Admin installing module ${moduleCode} for tenant ${tenantId}`);
 
-    await this.moduleRegistry.installModule(tenantId, moduleCode);
+    // Verify module exists
+    const moduleDef = getModuleByCode(moduleCode as ModuleCode);
+    if (!moduleDef) {
+      throw new Error(`Module ${moduleCode} not found in registry`);
+    }
+
+    // Install (upsert)
+    await this.prisma.tenantModule.upsert({
+      where: {
+        tenantId_moduleCode: {
+          tenantId,
+          moduleCode,
+        },
+      },
+      create: {
+        tenantId,
+        moduleCode,
+        isEnabled: true,
+        config: {},
+      },
+      update: {
+        isEnabled: true,
+      },
+    });
 
     this.logger.log(`Module ${moduleCode} installed successfully for tenant ${tenantId}`);
   }
@@ -328,7 +422,18 @@ export class AdminService {
   async uninstallModuleFromTenant(tenantId: string, moduleCode: string): Promise<void> {
     this.logger.log(`Platform Admin uninstalling module ${moduleCode} from tenant ${tenantId}`);
 
-    await this.moduleRegistry.uninstallModule(tenantId, moduleCode);
+    // Soft delete - just disable
+    await this.prisma.tenantModule.update({
+      where: {
+        tenantId_moduleCode: {
+          tenantId,
+          moduleCode,
+        },
+      },
+      data: {
+        isEnabled: false,
+      },
+    });
 
     this.logger.log(`Module ${moduleCode} uninstalled from tenant ${tenantId}`);
   }

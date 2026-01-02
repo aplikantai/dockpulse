@@ -6,24 +6,38 @@ export interface PlatformStatsDto {
   tenants: {
     total: number;
     active: number;
+    trial: number;
+    suspended: number;
     inactive: number;
     byPlan: {
       [key: string]: number;
     };
   };
   modules: {
-    total: number;
-    installed: number; // Total installations across all tenants
-    byModule: {
-      [moduleCode: string]: {
-        name: string;
-        installations: number;
-      };
-    };
-  };
+    code: string;
+    name: string;
+    installations: number;
+  }[];
   users: {
     total: number;
     active: number; // Active in last 30 days
+  };
+  revenue: {
+    mrr: number;
+    arr: number;
+    growth: number;
+  };
+  recentTenants: {
+    id: string;
+    name: string;
+    slug: string;
+    createdAt: string;
+    plan: string;
+  }[];
+  issues: {
+    suspendedTenants: number;
+    failedPayments: number;
+    expiredTrials: number;
   };
   storage: {
     totalUsed: number; // In bytes

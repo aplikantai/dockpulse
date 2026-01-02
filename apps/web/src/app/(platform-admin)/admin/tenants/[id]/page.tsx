@@ -74,7 +74,7 @@ export default function TenantDetailPage() {
     try {
       setLoading(true);
       const response = await fetch(
-        `http://localhost:3003/api/admin/tenants/${tenantId}`
+        `/api/admin/tenants/${tenantId}`
       );
 
       if (!response.ok) {
@@ -93,7 +93,7 @@ export default function TenantDetailPage() {
 
   const fetchAvailableModules = async () => {
     try {
-      const response = await fetch('http://localhost:3003/api/admin/modules');
+      const response = await fetch('/api/admin/modules');
       if (response.ok) {
         const data = await response.json();
         setAvailableModules(data);
@@ -109,7 +109,7 @@ export default function TenantDetailPage() {
     try {
       setActionLoading(true);
       const response = await fetch(
-        `http://localhost:3003/api/admin/tenants/${tenantId}/modules/${moduleCode}`,
+        `/api/admin/tenants/${tenantId}/modules/${moduleCode}`,
         { method: 'POST' }
       );
 
@@ -133,7 +133,7 @@ export default function TenantDetailPage() {
     try {
       setActionLoading(true);
       const response = await fetch(
-        `http://localhost:3003/api/admin/tenants/${tenantId}/modules/${moduleCode}`,
+        `/api/admin/tenants/${tenantId}/modules/${moduleCode}`,
         { method: 'DELETE' }
       );
 

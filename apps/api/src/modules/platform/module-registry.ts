@@ -302,6 +302,10 @@ export const MODULE_REGISTRY: Record<ModuleCode, ModuleDefinition> = {
 /**
  * Helper functions
  */
+export function getAllModules(): ModuleDefinition[] {
+  return Object.values(MODULE_REGISTRY);
+}
+
 export function getAvailableModules(): ModuleDefinition[] {
   return Object.values(MODULE_REGISTRY).filter((m) => m.isActive);
 }
