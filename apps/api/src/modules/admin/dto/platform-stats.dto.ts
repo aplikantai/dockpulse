@@ -52,6 +52,18 @@ export interface PlatformStatsDto {
     last7d: number;
     last30d: number;
   };
+  charts: {
+    tenantsOverTime: {
+      date: string;
+      total: number;
+      new: number;
+    }[];
+    mrrGrowth: {
+      date: string;
+      mrr: number;
+      growth: number;
+    }[];
+  };
 }
 
 export interface TenantListDto {

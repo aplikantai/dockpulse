@@ -12,6 +12,20 @@ import {
   CheckCircle,
   Package,
 } from 'lucide-react';
+import {
+  LineChart,
+  Line,
+  AreaChart,
+  Area,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
+  ComposedChart,
+  Bar,
+} from 'recharts';
 
 interface DashboardStats {
   tenants: {
@@ -45,6 +59,18 @@ interface DashboardStats {
     suspendedTenants: number;
     failedPayments: number;
     expiredTrials: number;
+  };
+  charts: {
+    tenantsOverTime: {
+      date: string;
+      total: number;
+      new: number;
+    }[];
+    mrrGrowth: {
+      date: string;
+      mrr: number;
+      growth: number;
+    }[];
   };
 }
 
@@ -361,6 +387,110 @@ export default function AdminDashboardPage() {
           </div>
         </div>
       </GlassCard>
+
+      {/* Charts Section */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Tenants Over Time Chart */}
+        <GlassCard>
+          <h2 className="text-xl font-semibold text-gray-900 mb-6">
+            Wzrost liczby tenantów
+          </h2>
+          <ResponsiveContainer width="100%" height={300}>
+            <ComposedChart data={stats.charts.tenantsOverTime}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+              <XAxis
+                dataKey="date"
+                tick={{ fontSize: 12 }}
+                stroke="#6b7280"
+              />
+              <YAxis tick={{ fontSize: 12 }} stroke="#6b7280" />
+              <Tooltip
+                contentStyle={{
+                  backgroundColor: 'rgba(255, 255, 255, 0.95)',
+                  border: '1px solid #e5e7eb',
+                  borderRadius: '8px',
+                }}
+              />
+              <Legend />
+              <Area
+                type="monotone"
+                dataKey="total"
+                fill="#3b82f6"
+                stroke="#2563eb"
+                fillOpacity={0.3}
+                name="Łącznie"
+              />
+              <Bar
+                dataKey="new"
+                fill="#10b981"
+                name="Nowi"
+              />
+            </ComposedChart>
+          </ResponsiveContainer>
+        </GlassCard>
+
+        {/* MRR Growth Chart */}
+        <GlassCard>
+          <h2 className="text-xl font-semibold text-gray-900 mb-6">
+            Wzrost MRR
+          </h2>
+          <ResponsiveContainer width="100%" height={300}>
+            <LineChart data={stats.charts.mrrGrowth}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+              <XAxis
+                dataKey="date"
+                tick={{ fontSize: 12 }}
+                stroke="#6b7280"
+              />
+              <YAxis
+                yAxisId="left"
+                tick={{ fontSize: 12 }}
+                stroke="#6b7280"
+                tickFormatter={(value) => `${(value / 1000).toFixed(0)}k`}
+              />
+              <YAxis
+                yAxisId="right"
+                orientation="right"
+                tick={{ fontSize: 12 }}
+                stroke="#6b7280"
+                tickFormatter={(value) => `${value}%`}
+              />
+              <Tooltip
+                contentStyle={{
+                  backgroundColor: 'rgba(255, 255, 255, 0.95)',
+                  border: '1px solid #e5e7eb',
+                  borderRadius: '8px',
+                }}
+                formatter={(value: any, name?: string) => {
+                  if (name === 'MRR') {
+                    return [formatCurrency(value), name];
+                  }
+                  return [`${value}%`, name];
+                }}
+              />
+              <Legend />
+              <Line
+                yAxisId="left"
+                type="monotone"
+                dataKey="mrr"
+                stroke="#8b5cf6"
+                strokeWidth={2}
+                dot={{ fill: '#8b5cf6', r: 4 }}
+                name="MRR"
+              />
+              <Line
+                yAxisId="right"
+                type="monotone"
+                dataKey="growth"
+                stroke="#10b981"
+                strokeWidth={2}
+                dot={{ fill: '#10b981', r: 4 }}
+                name="Wzrost %"
+              />
+            </LineChart>
+          </ResponsiveContainer>
+        </GlassCard>
+      </div>
     </div>
   );
 }

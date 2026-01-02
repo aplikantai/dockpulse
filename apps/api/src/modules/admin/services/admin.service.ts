@@ -166,6 +166,10 @@ export class AdminService {
       return daysSinceCreation > 14 && daysSinceCreation <= 16; // Trial expired 0-2 days ago
     }).length;
 
+    // Generate chart data for last 12 months
+    const tenantsOverTime = await this.generateTenantsOverTimeData(allTenants);
+    const mrrGrowthData = await this.generateMRRGrowthData(allTenants, modulesByCode);
+
     return {
       tenants: {
         total: totalTenants,
@@ -200,7 +204,108 @@ export class AdminService {
         last7d: events7d,
         last30d: events30d,
       },
+      charts: {
+        tenantsOverTime,
+        mrrGrowth: mrrGrowthData,
+      },
     };
+  }
+
+  /**
+   * Generate tenants over time data (last 12 months)
+   */
+  private async generateTenantsOverTimeData(allTenants: any[]): Promise<{
+    date: string;
+    total: number;
+    new: number;
+  }[]> {
+    const now = new Date();
+    const data = [];
+
+    // Generate data for last 12 months
+    for (let i = 11; i >= 0; i--) {
+      const targetDate = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const monthStart = new Date(targetDate.getFullYear(), targetDate.getMonth(), 1);
+      const monthEnd = new Date(targetDate.getFullYear(), targetDate.getMonth() + 1, 0);
+
+      // Count tenants created up to this month
+      const totalByMonth = allTenants.filter(
+        t => new Date(t.createdAt) <= monthEnd,
+      ).length;
+
+      // Count new tenants in this month
+      const newInMonth = allTenants.filter(t => {
+        const createdDate = new Date(t.createdAt);
+        return createdDate >= monthStart && createdDate <= monthEnd;
+      }).length;
+
+      data.push({
+        date: targetDate.toLocaleDateString('pl-PL', {
+          month: 'short',
+          year: 'numeric',
+        }),
+        total: totalByMonth,
+        new: newInMonth,
+      });
+    }
+
+    return data;
+  }
+
+  /**
+   * Generate MRR growth data (last 12 months)
+   */
+  private async generateMRRGrowthData(
+    allTenants: any[],
+    modulesByCode: Record<string, any>,
+  ): Promise<{
+    date: string;
+    mrr: number;
+    growth: number;
+  }[]> {
+    const now = new Date();
+    const data = [];
+    let previousMRR = 0;
+
+    // Generate data for last 12 months
+    for (let i = 11; i >= 0; i--) {
+      const targetDate = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const monthEnd = new Date(targetDate.getFullYear(), targetDate.getMonth() + 1, 0);
+
+      // Calculate MRR for tenants that existed at end of this month
+      let monthMRR = 0;
+      const existingTenants = allTenants.filter(
+        t => new Date(t.createdAt) <= monthEnd,
+      );
+
+      existingTenants.forEach(tenant => {
+        tenant.modules.forEach(tm => {
+          // Only count modules that were enabled
+          if (tm.isEnabled) {
+            const moduleDef = modulesByCode[tm.moduleCode];
+            if (moduleDef && moduleDef.price) {
+              monthMRR += moduleDef.price;
+            }
+          }
+        });
+      });
+
+      // Calculate growth percentage
+      const growth = previousMRR > 0 ? ((monthMRR - previousMRR) / previousMRR) * 100 : 0;
+
+      data.push({
+        date: targetDate.toLocaleDateString('pl-PL', {
+          month: 'short',
+          year: 'numeric',
+        }),
+        mrr: Math.round(monthMRR),
+        growth: Math.round(growth * 10) / 10, // Round to 1 decimal
+      });
+
+      previousMRR = monthMRR;
+    }
+
+    return data;
   }
 
   /**

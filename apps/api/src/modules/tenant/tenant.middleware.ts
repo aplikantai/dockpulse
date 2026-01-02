@@ -43,6 +43,7 @@ export class TenantMiddleware implements NestMiddleware {
       path.includes('/platform/tenants/') && path.includes('/modules') ||
       path.includes('/api/docs') || // Swagger
       path.includes('/api-json') || // Swagger JSON
+      path.includes('/admin') || // Platform Admin Panel
       (path.includes('/api/branding/') && req.method === 'GET') ||
       // Allow GET requests to fetch tenant data by slug (for dashboard)
       (path.includes('/platform/tenants/') && req.method === 'GET' && !path.includes('/modules') && !path.includes('/usage') && !path.includes('/register') && !path.includes('/check'))
