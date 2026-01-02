@@ -300,9 +300,9 @@ export class BrandingService {
       const isValidHex = (color: string) => /^#[0-9A-Fa-f]{6}$/.test(color);
 
       return {
-        primary: isValidHex(colors.primary) ? colors.primary : '#2B579A',
-        secondary: isValidHex(colors.secondary) ? colors.secondary : '#4472C4',
-        accent: isValidHex(colors.accent) ? colors.accent : '#70AD47',
+        primary: isValidHex(colors.primary) ? colors.primary : '#6366f1',
+        secondary: isValidHex(colors.secondary) ? colors.secondary : '#8b5cf6',
+        accent: isValidHex(colors.accent) ? colors.accent : '#22d3ee',
       };
     } catch (error) {
       this.logger.warn(`Color extraction failed (using defaults): ${error.message}`);
@@ -365,9 +365,9 @@ export class BrandingService {
    */
   private getDefaultColors(): BrandColors {
     return {
-      primary: '#2B579A',
-      secondary: '#4472C4',
-      accent: '#70AD47',
+      primary: '#6366f1',    // Indigo (from logo gradient)
+      secondary: '#8b5cf6',  // Purple (from logo gradient)
+      accent: '#22d3ee',     // Cyan (pulse line color)
     };
   }
 
