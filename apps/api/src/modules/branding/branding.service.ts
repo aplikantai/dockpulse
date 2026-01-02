@@ -138,8 +138,9 @@ export class BrandingService {
           email: companyData.email,
         },
         branding: {
-          logoUrl: logoUrl || '/assets/default-logo.png',
-          faviconUrl: faviconUrl || '/favicon.ico',
+          // Priority: Logo > Favicon for display (logos are better for branding)
+          logoUrl: logoUrl || faviconUrl || '/assets/default-logo.png',
+          faviconUrl: faviconUrl || logoUrl || '/favicon.ico',
           colors,
         },
       };

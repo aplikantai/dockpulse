@@ -33,6 +33,7 @@ export default function HomePage() {
   const [isExtracting, setIsExtracting] = useState(false);
   const [preview, setPreview] = useState<BrandingPreview | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [extractionStep, setExtractionStep] = useState<string>('');
 
   const handleExtract = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -52,9 +53,15 @@ export default function HomePage() {
     setIsExtracting(true);
     setError(null);
     setPreview(null);
+    setExtractionStep('Łączenie ze stroną...');
 
     try {
       const url = websiteUrl.startsWith('http') ? websiteUrl : `https://${websiteUrl}`;
+
+      // Simulate progressive steps for better UX
+      setTimeout(() => setExtractionStep('Pobieranie logo...'), 500);
+      setTimeout(() => setExtractionStep('Wyciąganie kolorów marki...'), 1500);
+      setTimeout(() => setExtractionStep('Zbieranie danych firmy...'), 2500);
 
       const response = await fetch('/api/branding/preview', {
         method: 'POST',
@@ -67,9 +74,14 @@ export default function HomePage() {
       }
 
       const result: BrandingPreview = await response.json();
-      setPreview(result);
+      setExtractionStep('Gotowe!');
+      setTimeout(() => {
+        setPreview(result);
+        setExtractionStep('');
+      }, 300);
     } catch (err) {
       setError('Nie udało się pobrać brandingu. Sprawdź adres URL lub spróbuj ponownie.');
+      setExtractionStep('');
     } finally {
       setIsExtracting(false);
     }
@@ -207,6 +219,20 @@ export default function HomePage() {
                   </div>
                 </div>
 
+                {/* Extraction Progress */}
+                {isExtracting && extractionStep && (
+                  <div className="p-4 bg-blue-50 border-2 border-blue-200 rounded-2xl">
+                    <div className="flex items-center gap-3 text-blue-700">
+                      <Loader2 className="w-5 h-5 animate-spin flex-shrink-0" />
+                      <div>
+                        <p className="text-sm font-bold">AI zbiera informacje o Twojej firmie</p>
+                        <p className="text-xs text-blue-600 mt-1">{extractionStep}</p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Error Message */}
                 {error && (
                   <div className="p-4 bg-red-50 border-2 border-red-200 rounded-2xl">
                     <div className="flex items-center gap-3 text-red-700">
