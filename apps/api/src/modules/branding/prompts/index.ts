@@ -14,16 +14,22 @@ HTML content (truncated):
 
 Extract:
 1. Company name (check <title>, <h1>, meta tags, footer)
-2. NIP / Tax ID (look for patterns like "NIP: 123-456-78-90" or "NIP 1234567890")
-3. Address (street, city, postal code - usually in footer or contact section)
-4. Phone number (look for tel: links or patterns like +48 123 456 789)
-5. Email contact (look for mailto: links or patterns like contact@domain.pl)
-6. Logo URL (check <img> with alt containing "logo", or header images)
-7. Favicon URL (check <link rel="icon"> or <link rel="shortcut icon">)
+2. Slogan/Tagline (check meta description, hero section, <p> near company name)
+3. Company description (short description from meta tags or about section)
+4. NIP / Tax ID (look for patterns like "NIP: 123-456-78-90" or "NIP 1234567890")
+5. Address (street, city, postal code - usually in footer or contact section)
+6. Phone number (look for tel: links or patterns like +48 123 456 789)
+7. Email contact (look for mailto: links or patterns like contact@domain.pl)
+8. Website URL (use the base URL provided)
+9. Social media links (Facebook, LinkedIn, Instagram, Twitter, YouTube - check footer, header, social icons)
+10. Logo URL (check <img> with alt containing "logo", or header images)
+11. Favicon URL (check <link rel="icon"> or <link rel="shortcut icon">)
 
 Return ONLY valid JSON with this exact structure:
 {
   "companyName": "Company Name",
+  "slogan": "Company tagline or slogan",
+  "description": "Brief company description (1-2 sentences max)",
   "nip": "123-456-78-90",
   "address": {
     "street": "ul. Przykladowa 10",
@@ -32,11 +38,19 @@ Return ONLY valid JSON with this exact structure:
   },
   "phone": "+48 123 456 789",
   "email": "kontakt@firma.pl",
+  "website": "https://example.com",
+  "socialMedia": {
+    "facebook": "https://facebook.com/companypage",
+    "linkedin": "https://linkedin.com/company/companyname",
+    "instagram": "https://instagram.com/companyname",
+    "twitter": "https://twitter.com/companyname",
+    "youtube": "https://youtube.com/@companyname"
+  },
   "logoUrl": "/path/to/logo.png",
   "faviconUrl": "/favicon.ico"
 }
 
-If a field cannot be found, use null for that field.
+If a field cannot be found, use null for that field. For socialMedia, omit platforms that are not found.
 `;
 
 export const EXTRACT_COLORS_PROMPT = `

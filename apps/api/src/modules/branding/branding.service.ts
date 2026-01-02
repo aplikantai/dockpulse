@@ -132,10 +132,14 @@ export class BrandingService {
       return {
         companyData: {
           name: companyData.companyName,
+          slogan: companyData.slogan,
+          description: companyData.description,
           nip: companyData.nip,
           address: companyData.address,
           phone: companyData.phone,
           email: companyData.email,
+          website: companyData.website || websiteUrl,
+          socialMedia: companyData.socialMedia,
         },
         branding: {
           // Priority: Logo > Favicon for display (logos are better for branding)

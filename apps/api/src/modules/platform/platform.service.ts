@@ -14,19 +14,13 @@ import {
   RegisterTenantDto,
 } from './dto/platform.dto';
 import * as bcrypt from 'bcrypt';
-
-// Available modules that can be enabled for a tenant
-export const AVAILABLE_MODULES = [
-  'customers',
-  'products',
-  'orders',
-  'quotes',
-  'inventory',
-  'reports',
-  'portal',
-  'notifications',
-  'ai-assistant',
-] as const;
+import {
+  MODULE_REGISTRY,
+  ModuleCode,
+  getAvailableModules,
+  getModuleByCode,
+  checkModuleDependencies,
+} from './module-registry';
 
 export const DEFAULT_MODULES = ['customers', 'products', 'orders'];
 
@@ -58,7 +52,7 @@ export const PLAN_LIMITS: Record<TenantPlan, {
     maxUsers: -1, // unlimited
     maxCustomers: -1,
     maxProducts: -1,
-    modules: AVAILABLE_MODULES as unknown as string[],
+    modules: Object.keys(MODULE_REGISTRY), // All modules
   },
 };
 
@@ -210,6 +204,21 @@ export class PlatformService {
   async getTenantBySlug(slug: string): Promise<any> {
     const tenant = await this.prisma.tenant.findUnique({
       where: { slug },
+    });
+
+    if (!tenant) {
+      throw new NotFoundException('Tenant nie znaleziony');
+    }
+
+    return tenant;
+  }
+
+  async getTenantWithModules(slug: string): Promise<any> {
+    const tenant = await this.prisma.tenant.findUnique({
+      where: { slug },
+      include: {
+        modules: true,
+      },
     });
 
     if (!tenant) {
@@ -570,21 +579,137 @@ export class PlatformService {
     return limits[plan] || limits.free;
   }
 
-  async getAvailableModules(): Promise<string[]> {
-    return [...AVAILABLE_MODULES];
+  /**
+   * Zwraca wszystkie dostępne moduły w systemie
+   */
+  async getAvailableModules() {
+    const modules = getAvailableModules();
+    return {
+      modules: modules.map((m) => ({
+        code: m.code,
+        name: m.name,
+        namePl: m.namePl,
+        description: m.description,
+        descriptionPl: m.descriptionPl,
+        icon: m.icon,
+        category: m.category,
+        price: m.price,
+        features: m.features,
+        dependencies: m.dependencies,
+      })),
+    };
   }
 
-  async getTenantModules(tenantId: string): Promise<string[]> {
+  /**
+   * Zwraca aktywne moduły dla tenanta (po slug)
+   */
+  async getTenantModules(slug: string) {
     const tenant = await this.prisma.tenant.findUnique({
-      where: { id: tenantId },
+      where: { slug },
+      include: {
+        modules: true, // TenantModule relation
+      },
     });
 
     if (!tenant) {
-      throw new NotFoundException('Tenant nie znaleziony');
+      throw new NotFoundException(`Tenant '${slug}' nie znaleziony`);
     }
 
-    const settings = tenant.settings as any || {};
-    return settings.modules || DEFAULT_MODULES;
+    // Map TenantModule to module definitions
+    const enabledModules = tenant.modules
+      .filter((tm) => tm.isEnabled)
+      .map((tm) => {
+        const moduleDef = getModuleByCode(tm.moduleCode as ModuleCode);
+        return {
+          code: tm.moduleCode,
+          isEnabled: tm.isEnabled,
+          config: tm.config,
+          definition: moduleDef
+            ? {
+                name: moduleDef.name,
+                namePl: moduleDef.namePl,
+                icon: moduleDef.icon,
+                routes: moduleDef.routes,
+              }
+            : null,
+        };
+      });
+
+    return {
+      tenantId: tenant.id,
+      slug: tenant.slug,
+      modules: enabledModules,
+    };
+  }
+
+  /**
+   * Aktywuje/dezaktywuje moduł dla tenanta
+   */
+  async toggleTenantModule(
+    tenantId: string,
+    moduleCode: string,
+    isEnabled: boolean,
+    config?: any,
+  ) {
+    // Sprawdź czy moduł istnieje
+    const moduleDef = getModuleByCode(moduleCode as ModuleCode);
+    if (!moduleDef) {
+      throw new BadRequestException(`Moduł '${moduleCode}' nie istnieje`);
+    }
+
+    if (!moduleDef.isActive) {
+      throw new BadRequestException(
+        `Moduł '${moduleCode}' jest w przygotowaniu i nie może być aktywowany`,
+      );
+    }
+
+    // Sprawdź zależności jeśli aktywujemy moduł
+    if (isEnabled && moduleDef.dependencies) {
+      const tenant = await this.prisma.tenant.findUnique({
+        where: { id: tenantId },
+        include: { modules: true },
+      });
+
+      const enabledModuleCodes = tenant.modules
+        .filter((m) => m.isEnabled)
+        .map((m) => m.moduleCode) as ModuleCode[];
+
+      const depCheck = checkModuleDependencies(moduleCode as ModuleCode, enabledModuleCodes);
+      if (!depCheck.isValid) {
+        throw new BadRequestException(
+          `Moduł '${moduleCode}' wymaga najpierw aktywacji: ${depCheck.missing.join(', ')}`,
+        );
+      }
+    }
+
+    // Upsert TenantModule
+    const tenantModule = await this.prisma.tenantModule.upsert({
+      where: {
+        tenantId_moduleCode: {
+          tenantId,
+          moduleCode,
+        },
+      },
+      create: {
+        tenantId,
+        moduleCode,
+        isEnabled,
+        config: config || {},
+      },
+      update: {
+        isEnabled,
+        config: config || {},
+      },
+    });
+
+    return {
+      success: true,
+      module: {
+        code: tenantModule.moduleCode,
+        isEnabled: tenantModule.isEnabled,
+        config: tenantModule.config,
+      },
+    };
   }
 
   /**
@@ -608,14 +733,30 @@ export class PlatformService {
       );
     }
 
-    // Map template to modules
-    const templateModules: Record<string, string[]> = {
-      services: ['customers', 'orders', 'quotes', 'portal'],
-      production: ['customers', 'orders', 'products', 'inventory', 'portal'],
-      trade: ['customers', 'orders', 'products', 'quotes', 'portal'],
+    // Map template to modules (NEW: use ModuleCode enum)
+    const templateModules: Record<string, ModuleCode[]> = {
+      services: [ModuleCode.CRM, ModuleCode.ORDERS, ModuleCode.QUOTES],
+      production: [ModuleCode.CRM, ModuleCode.ORDERS, ModuleCode.PRODUCTS, ModuleCode.INVENTORY],
+      trade: [ModuleCode.CRM, ModuleCode.ORDERS, ModuleCode.PRODUCTS, ModuleCode.QUOTES],
     };
 
-    const modules = templateModules[dto.template] || DEFAULT_MODULES;
+    // Convert old module names to new codes if provided
+    const convertedModules = dto.modules
+      ? dto.modules.map((m) => {
+          // Map old names to new codes
+          const moduleMap: Record<string, ModuleCode> = {
+            customers: ModuleCode.CRM,
+            orders: ModuleCode.ORDERS,
+            products: ModuleCode.PRODUCTS,
+            quotes: ModuleCode.QUOTES,
+            inventory: ModuleCode.INVENTORY,
+            reports: ModuleCode.REPORTS,
+          };
+          return moduleMap[m] || m;
+        })
+      : null;
+
+    const modules = convertedModules || templateModules[dto.template] || [ModuleCode.CRM, ModuleCode.ORDERS, ModuleCode.PRODUCTS];
 
     // Start with FREE plan for new registrations
     const plan = TenantPlan.FREE;
@@ -625,21 +766,41 @@ export class PlatformService {
     const randomPassword = this.generateRandomPassword();
     const hashedPassword = await bcrypt.hash(randomPassword, 10);
 
+    // Build branding object from DTO
+    const brandingData = {
+      logoUrl: dto.logoUrl,
+      faviconUrl: dto.faviconUrl,
+      companyName: dto.companyName,
+      slogan: dto.slogan,
+      description: dto.description,
+      colors: dto.colors,
+    };
+
+    // Build company data object from DTO
+    const companyData = {
+      name: dto.companyName,
+      nip: dto.nip,
+      phone: dto.phone,
+      email: dto.email,
+      website: dto.websiteUrl,
+      address: dto.address,
+      socialMedia: dto.socialMedia,
+    };
+
     // Create tenant
     const tenant = await this.prisma.tenant.create({
       data: {
         slug: dto.slug,
         name: dto.companyName,
-        // domain: dto.websiteUrl, // Removed - field doesn't exist in schema
-        // status: TenantStatus.ACTIVE, // Removed - field doesn't exist in schema
-        // plan, // Removed - field doesn't exist in schema
+        template: dto.template,
+        // Store branding in tenant.branding JSON field
+        branding: brandingData,
+        // Store configuration in settings
         settings: {
           template: dto.template,
           modules,
           limits: planLimits,
-          branding: {
-            companyName: dto.companyName,
-          },
+          companyData, // Store full company data
           // Store plan, status, and domain in settings
           plan: plan,
           status: TenantStatus.ACTIVE, // Auto-activate for free plan
@@ -661,7 +822,24 @@ export class PlatformService {
       },
     });
 
+    // Create TenantModule records for enabled modules
+    if (modules && modules.length > 0) {
+      await this.prisma.tenantModule.createMany({
+        data: modules.map((moduleCode) => ({
+          tenantId: tenant.id,
+          moduleCode: moduleCode,
+          isEnabled: true,
+          config: {},
+        })),
+      });
+    }
+
     // TODO: Send welcome email with password
+
+    // Add subdomain to SSL certificate (asynchronously, don't block response)
+    this.addSubdomainToSSL(tenant.slug).catch((err) => {
+      console.error(`Failed to add SSL for ${tenant.slug}:`, err);
+    });
 
     return {
       success: true,
@@ -670,6 +848,28 @@ export class PlatformService {
       message: 'Konto utworzone pomyślnie! Sprawdź email z hasłem dostępowym.',
       loginUrl: `https://${tenant.slug}.dockpulse.com/login`,
     };
+  }
+
+  /**
+   * Add new subdomain to SSL certificate
+   */
+  private async addSubdomainToSSL(slug: string): Promise<void> {
+    const { exec } = require('child_process');
+    const util = require('util');
+    const execPromise = util.promisify(exec);
+
+    try {
+      const { stdout, stderr } = await execPromise(
+        `/root/add-ssl-subdomain.sh ${slug}`,
+      );
+      console.log(`[SSL] Added ${slug}.dockpulse.com to certificate:`, stdout);
+      if (stderr) {
+        console.warn(`[SSL] Warnings:`, stderr);
+      }
+    } catch (error) {
+      console.error(`[SSL] Failed to add ${slug}.dockpulse.com:`, error);
+      throw error;
+    }
   }
 
   private generateRandomPassword(): string {

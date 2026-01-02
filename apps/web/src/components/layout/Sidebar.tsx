@@ -18,6 +18,7 @@ import {
   LogOut,
   Building2,
 } from 'lucide-react';
+import { useTenant } from '@/contexts/TenantContext';
 
 interface NavItem {
   name: string;
@@ -44,6 +45,7 @@ const bottomNavItems: NavItem[] = [
 export function Sidebar() {
   const [collapsed, setCollapsed] = useState(false);
   const pathname = usePathname();
+  const { tenant, isLoading } = useTenant();
 
   const isActive = (href: string) => {
     if (href === '/dashboard') {
@@ -51,6 +53,11 @@ export function Sidebar() {
     }
     return pathname.startsWith(href);
   };
+
+  // Get brand colors from tenant or use defaults
+  const primaryColor = tenant?.branding?.colors?.primary || '#2563eb';
+  const companyName = tenant?.name || 'DockPulse';
+  const logoUrl = tenant?.branding?.logoUrl;
 
   return (
     <aside
@@ -68,12 +75,43 @@ export function Sidebar() {
         {/* Logo */}
         <div className="flex items-center h-16 px-4 border-b border-gray-100/50">
           <Link href="/dashboard" className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-primary-600 flex items-center justify-center shadow-lg shadow-primary/25">
-              <Building2 className="w-6 h-6 text-white" />
+            <div
+              className="w-10 h-10 rounded-xl flex items-center justify-center shadow-lg"
+              style={{
+                backgroundColor: `${primaryColor}15`,
+                boxShadow: `0 4px 14px 0 ${primaryColor}25`
+              }}
+            >
+              {logoUrl ? (
+                <img
+                  src={logoUrl}
+                  alt={companyName}
+                  className="w-8 h-8 object-contain"
+                  onError={(e) => {
+                    // Fallback to icon if logo fails to load
+                    const target = e.target as HTMLImageElement;
+                    target.style.display = 'none';
+                    const parent = target.parentElement;
+                    if (parent) {
+                      parent.style.background = `linear-gradient(135deg, ${primaryColor}, ${primaryColor}dd)`;
+                      const icon = document.createElement('div');
+                      icon.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9h18v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V9Z"/><path d="m3 9 2.45-4.9A2 2 0 0 1 7.24 3h9.52a2 2 0 0 1 1.8 1.1L21 9"/><path d="M12 3v6"/></svg>';
+                      parent.appendChild(icon);
+                    }
+                  }}
+                />
+              ) : (
+                <div
+                  className="w-full h-full rounded-xl flex items-center justify-center"
+                  style={{ background: `linear-gradient(135deg, ${primaryColor}, ${primaryColor}dd)` }}
+                >
+                  <Building2 className="w-6 h-6 text-white" />
+                </div>
+              )}
             </div>
             {!collapsed && (
               <span className="font-bold text-xl text-gray-900">
-                DockPulse
+                {companyName}
               </span>
             )}
           </Link>
@@ -92,10 +130,14 @@ export function Sidebar() {
                       flex items-center gap-3 px-3 py-2.5 rounded-xl
                       transition-all duration-200
                       ${active
-                        ? 'bg-primary text-white shadow-lg shadow-primary/25'
+                        ? 'text-white shadow-lg'
                         : 'text-gray-600 hover:bg-gray-100/50 hover:text-gray-900'
                       }
                     `}
+                    style={active ? {
+                      background: primaryColor,
+                      boxShadow: `0 10px 15px -3px ${primaryColor}25, 0 4px 6px -4px ${primaryColor}25`
+                    } : undefined}
                     title={collapsed ? item.name : undefined}
                   >
                     <item.icon className={`w-5 h-5 flex-shrink-0 ${active ? 'text-white' : ''}`} />
@@ -103,13 +145,16 @@ export function Sidebar() {
                       <>
                         <span className="flex-1 font-medium">{item.name}</span>
                         {item.badge && (
-                          <span className={`
-                            px-2 py-0.5 text-xs font-semibold rounded-full
-                            ${active
-                              ? 'bg-white/20 text-white'
-                              : 'bg-primary/10 text-primary'
-                            }
-                          `}>
+                          <span
+                            className={`
+                              px-2 py-0.5 text-xs font-semibold rounded-full
+                              ${active ? 'bg-white/20 text-white' : ''}
+                            `}
+                            style={!active ? {
+                              backgroundColor: `${primaryColor}10`,
+                              color: primaryColor
+                            } : undefined}
+                          >
                             {item.badge}
                           </span>
                         )}
@@ -135,10 +180,14 @@ export function Sidebar() {
                       flex items-center gap-3 px-3 py-2.5 rounded-xl
                       transition-all duration-200
                       ${active
-                        ? 'bg-primary text-white shadow-lg shadow-primary/25'
+                        ? 'text-white shadow-lg'
                         : 'text-gray-600 hover:bg-gray-100/50 hover:text-gray-900'
                       }
                     `}
+                    style={active ? {
+                      background: primaryColor,
+                      boxShadow: `0 10px 15px -3px ${primaryColor}25, 0 4px 6px -4px ${primaryColor}25`
+                    } : undefined}
                     title={collapsed ? item.name : undefined}
                   >
                     <item.icon className={`w-5 h-5 flex-shrink-0 ${active ? 'text-white' : ''}`} />

@@ -154,24 +154,6 @@ export class PlatformController {
     return this.platformService.deleteTenant(id);
   }
 
-  // ============ MODULES ============
-
-  @Get('modules')
-  @ApiOperation({ summary: 'Lista dostępnych modułów' })
-  @ApiBearerAuth()
-  @UseGuards(PlatformAdminGuard)
-  async getAvailableModules() {
-    return this.platformService.getAvailableModules();
-  }
-
-  @Get('tenants/:id/modules')
-  @ApiOperation({ summary: 'Moduły tenanta' })
-  @ApiBearerAuth()
-  @UseGuards(PlatformAdminGuard)
-  async getTenantModules(@Param('id') id: string) {
-    return this.platformService.getTenantModules(id);
-  }
-
   // ============ STATS ============
 
   @Get('stats')
@@ -210,5 +192,44 @@ export class PlatformController {
     } catch {
       return { available: true };
     }
+  }
+
+  @Public()
+  @Get('tenants/by-slug/:slug')
+  @ApiOperation({ summary: 'Pobierz dane tenanta (publiczny endpoint dla dashboard)' })
+  async getTenantBySlug(@Param('slug') slug: string) {
+    return this.platformService.getTenantWithModules(slug);
+  }
+
+  // ============ MODULES (Public - dostępne dla wszystkich) ============
+
+  @Public()
+  @Get('modules/available')
+  @ApiOperation({ summary: 'Lista wszystkich dostępnych modułów w systemie' })
+  async getAvailableModules() {
+    return this.platformService.getAvailableModules();
+  }
+
+  @Public()
+  @Get('tenants/:slug/modules')
+  @ApiOperation({ summary: 'Pobierz aktywne moduły dla tenanta (publiczny)' })
+  async getTenantModules(@Param('slug') slug: string) {
+    return this.platformService.getTenantModules(slug);
+  }
+
+  @Post('tenants/:id/modules')
+  @ApiOperation({ summary: 'Aktywuj/dezaktywuj moduł dla tenanta' })
+  @ApiBearerAuth()
+  @UseGuards(PlatformAdminGuard)
+  async toggleTenantModule(
+    @Param('id') tenantId: string,
+    @Body() dto: { moduleCode: string; isEnabled: boolean; config?: any },
+  ) {
+    return this.platformService.toggleTenantModule(
+      tenantId,
+      dto.moduleCode,
+      dto.isEnabled,
+      dto.config,
+    );
   }
 }

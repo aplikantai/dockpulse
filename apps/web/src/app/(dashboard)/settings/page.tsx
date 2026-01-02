@@ -12,7 +12,7 @@ const settingsSections = [
   { name: 'Bezpieczeństwo', description: 'Hasło, 2FA, aktywne sesje', icon: Shield, href: '#' },
   { name: 'Wygląd', description: 'Branding, kolory, logo', icon: Palette, href: '#' },
   { name: 'Ustawienia AI', description: 'Modele AI, asystent, automatyzacja', icon: Brain, href: '/settings/ai' },
-  { name: 'Moduły', description: 'Aktywne moduły i integracje', icon: Database, href: '#' },
+  { name: 'Moduły', description: 'Aktywuj/dezaktywuj moduły systemu', icon: Database, href: '/settings/modules' },
 ];
 
 export default function SettingsPage() {

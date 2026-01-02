@@ -6,6 +6,9 @@ export function middleware(request: NextRequest) {
   const subdomain = hostname.split('.')[0];
   const pathname = request.nextUrl.pathname;
 
+  // Check if this is the main domain (dockpulse.com without subdomain)
+  const isMainDomain = hostname === 'dockpulse.com' || hostname === 'www.dockpulse.com' || hostname.startsWith('localhost');
+
   // Redirect subdomains to their proper sections
   if (pathname === '/') {
     if (hostname.includes('app.dockpulse.com')) {
@@ -22,7 +25,8 @@ export function middleware(request: NextRequest) {
   // Process API requests - add tenant header
   if (pathname.startsWith('/api/')) {
     // Skip for localhost and main domains
-    if (subdomain && subdomain !== 'localhost' && subdomain !== 'app' && subdomain !== 'www' && subdomain !== 'admin') {
+    const skipSubdomains = ['localhost', 'app', 'www', 'admin', 'api', 'dockpulse'];
+    if (!isMainDomain && subdomain && !skipSubdomains.includes(subdomain)) {
       // Create new headers with x-tenant-id
       const requestHeaders = new Headers(request.headers);
       requestHeaders.set('x-tenant-id', subdomain);

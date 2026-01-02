@@ -20,12 +20,24 @@ export interface Address {
   country?: string;
 }
 
+export interface SocialMedia {
+  facebook?: string;
+  linkedin?: string;
+  instagram?: string;
+  twitter?: string;
+  youtube?: string;
+}
+
 export interface CompanyData {
   companyName: string;
+  slogan?: string;
+  description?: string;
   nip?: string;
   address?: Address;
   phone?: string;
   email?: string;
+  website?: string;
+  socialMedia?: SocialMedia;
   logoUrl?: string;
   faviconUrl?: string;
 }
@@ -42,10 +54,14 @@ export interface BrandingSettings {
 export interface BrandingResult {
   companyData: {
     name: string;
+    slogan?: string;
+    description?: string;
     nip?: string;
     address?: Address;
     phone?: string;
     email?: string;
+    website?: string;
+    socialMedia?: SocialMedia;
   };
   branding: {
     logoUrl: string;
@@ -56,10 +72,14 @@ export interface BrandingResult {
 
 export interface ExtractedCompanyData {
   companyName: string;
+  slogan?: string;
+  description?: string;
   nip?: string;
   address?: Address;
   phone?: string;
   email?: string;
+  website?: string;
+  socialMedia?: SocialMedia;
   logoUrl?: string;
   faviconUrl?: string;
 }

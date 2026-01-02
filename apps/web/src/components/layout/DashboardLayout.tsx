@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { Sidebar } from './Sidebar';
 import { Navbar } from './Navbar';
+import { TenantProvider } from '@/contexts/TenantContext';
 
 interface DashboardLayoutProps {
   children: React.ReactNode;
@@ -46,25 +47,27 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
-      {/* Sidebar */}
-      <Sidebar />
+    <TenantProvider>
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
+        {/* Sidebar */}
+        <Sidebar />
 
-      {/* Navbar */}
-      <Navbar sidebarCollapsed={sidebarCollapsed} />
+        {/* Navbar */}
+        <Navbar sidebarCollapsed={sidebarCollapsed} />
 
-      {/* Main content */}
-      <main
-        className={`
-          pt-16 min-h-screen
-          transition-all duration-300
-          ${sidebarCollapsed ? 'pl-20' : 'pl-64'}
-        `}
-      >
-        <div className="p-6 lg:p-8">
-          {children}
-        </div>
-      </main>
-    </div>
+        {/* Main content */}
+        <main
+          className={`
+            pt-16 min-h-screen
+            transition-all duration-300
+            ${sidebarCollapsed ? 'pl-20' : 'pl-64'}
+          `}
+        >
+          <div className="p-6 lg:p-8">
+            {children}
+          </div>
+        </main>
+      </div>
+    </TenantProvider>
   );
 }

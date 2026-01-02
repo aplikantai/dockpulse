@@ -186,6 +186,83 @@ export class RegisterTenantDto {
   @ApiProperty({ example: '+48 123 456 789' })
   @IsString()
   adminPhone: string;
+
+  // ========== BRANDING DATA (from AI extraction) ==========
+
+  @ApiPropertyOptional({ description: 'Company logo URL', example: 'https://example.com/logo.png' })
+  @IsOptional()
+  @IsString()
+  logoUrl?: string;
+
+  @ApiPropertyOptional({ description: 'Company favicon URL', example: 'https://example.com/favicon.ico' })
+  @IsOptional()
+  @IsString()
+  faviconUrl?: string;
+
+  @ApiPropertyOptional({ description: 'Company slogan/tagline', example: 'Innovation at its best' })
+  @IsOptional()
+  @IsString()
+  slogan?: string;
+
+  @ApiPropertyOptional({ description: 'Company description', example: 'We provide top-quality services...' })
+  @IsOptional()
+  @IsString()
+  description?: string;
+
+  @ApiPropertyOptional({ description: 'Brand colors', example: { primary: '#2563eb', secondary: '#1e40af', accent: '#3b82f6' } })
+  @IsOptional()
+  @IsObject()
+  colors?: {
+    primary: string;
+    secondary: string;
+    accent: string;
+  };
+
+  // ========== COMPANY DATA ==========
+
+  @ApiPropertyOptional({ description: 'NIP / Tax ID', example: '123-456-78-90' })
+  @IsOptional()
+  @IsString()
+  nip?: string;
+
+  @ApiPropertyOptional({ description: 'Company phone number', example: '+48 123 456 789' })
+  @IsOptional()
+  @IsString()
+  phone?: string;
+
+  @ApiPropertyOptional({ description: 'Company email', example: 'kontakt@firma.pl' })
+  @IsOptional()
+  @IsEmail()
+  email?: string;
+
+  @ApiPropertyOptional({ description: 'Company address', example: { street: 'ul. Przykładowa 10', city: 'Warszawa', postalCode: '00-001' } })
+  @IsOptional()
+  @IsObject()
+  address?: {
+    street?: string;
+    city?: string;
+    postalCode?: string;
+    country?: string;
+  };
+
+  @ApiPropertyOptional({ description: 'Social media links', example: { facebook: 'https://facebook.com/company', linkedin: 'https://linkedin.com/company/name' } })
+  @IsOptional()
+  @IsObject()
+  socialMedia?: {
+    facebook?: string;
+    linkedin?: string;
+    instagram?: string;
+    twitter?: string;
+    youtube?: string;
+  };
+
+  // ========== MODULE CONFIGURATION ==========
+
+  @ApiPropertyOptional({ description: 'Custom modules to enable (overrides template defaults)', example: ['customers', 'products', 'orders', 'quotes'] })
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  modules?: string[];
 }
 
 // Usage Metrics Response Types
