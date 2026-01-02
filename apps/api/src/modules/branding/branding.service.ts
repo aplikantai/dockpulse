@@ -123,9 +123,10 @@ export class BrandingService {
       const logoUrl = this.resolveUrl(companyData.logoUrl, websiteUrl);
       const faviconUrl = this.resolveUrl(companyData.faviconUrl, websiteUrl);
 
-      // 4. Extract colors from logo with Vision API
-      const colors = logoUrl
-        ? await this.extractColorsFromLogo(logoUrl)
+      // 4. Extract colors from favicon (better compatibility than logo - usually PNG not SVG)
+      const imageUrl = faviconUrl || logoUrl;
+      const colors = imageUrl
+        ? await this.extractColorsFromLogo(imageUrl)
         : this.getDefaultColors();
 
       return {
@@ -265,7 +266,8 @@ export class BrandingService {
   }
 
   /**
-   * Extract colors from logo using Vision AI
+   * Extract colors from logo using algorithmic pixel analysis
+   * Fast, free, no AI required!
    */
   private async extractColorsFromLogo(logoUrl: string): Promise<BrandColors> {
     if (!logoUrl) {
@@ -273,36 +275,26 @@ export class BrandingService {
     }
 
     try {
-      // Convert logo to base64
-      const logoBase64 = await this.imageToBase64(logoUrl);
+      // Import color extractor
+      const { extractColorsFromImage } = await import('./utils/color-extractor');
 
-      const content = await this.openRouterService.visionCompletion({
-        messages: [
-          {
-            role: 'user',
-            content: [
-              { type: 'text', text: EXTRACT_COLORS_PROMPT },
-              {
-                type: 'image_url',
-                image_url: { url: `data:image/png;base64,${logoBase64}` },
-              },
-            ],
-          },
-        ] as any,
-        responseFormat: { type: 'json_object' },
-        temperature: 0.1,
-        maxTokens: 200,
-      });
+      // Resolve relative URL to absolute
+      const absoluteUrl = this.resolveUrl(logoUrl, logoUrl);
+      if (!absoluteUrl) {
+        throw new Error('Invalid logo URL');
+      }
 
-      const colors = JSON.parse(content);
+      this.logger.log(`Extracting colors from logo: ${absoluteUrl}`);
 
-      // Validate HEX format
-      const isValidHex = (color: string) => /^#[0-9A-Fa-f]{6}$/.test(color);
+      // Extract dominant colors using k-means clustering
+      const colors = await extractColorsFromImage(absoluteUrl);
+
+      this.logger.log(`Extracted colors: ${JSON.stringify(colors)}`);
 
       return {
-        primary: isValidHex(colors.primary) ? colors.primary : '#6366f1',
-        secondary: isValidHex(colors.secondary) ? colors.secondary : '#8b5cf6',
-        accent: isValidHex(colors.accent) ? colors.accent : '#22d3ee',
+        primary: colors.primary,
+        secondary: colors.secondary,
+        accent: colors.accent,
       };
     } catch (error) {
       this.logger.warn(`Color extraction failed (using defaults): ${error.message}`);
