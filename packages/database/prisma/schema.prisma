@@ -15,11 +15,18 @@ model Tenant {
   slug      String   @unique
   name      String
   domain    String?
+  subdomain String?  @unique // firma.dockpulse.com
   template  String   @default("services") // 'services' | 'production' | 'trade'
-  plan      String?  // plan identifier
+  plan      String? // plan identifier
   status    String   @default("active") // 'active' | 'suspended' | 'deleted'
-  branding  Json?
+  branding  Json?    // BrandExtractionResult from AI
   settings  Json?
+
+  // Onboarding
+  websiteUrl     String?  // URL strony firmy (źródło brandingu)
+  onboardedAt    DateTime? // Kiedy zakończono onboarding
+  onboardedBy    String?  // Kto wykonał onboarding (admin userId)
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -32,6 +39,13 @@ model Tenant {
   fieldConfigs    FieldConfig[]
   triggers        WorkflowTrigger[]
   eventLogs       EventLog[]
+  auditLogs       AuditLog[]
+  roleDefinitions RoleDefinition[]
+
+  // Nowe moduly
+  branches     Branch[]
+  locations    Location[]
+  dictionaries Dictionary[]
 
   @@map("tenants")
 }
@@ -41,18 +55,86 @@ model Tenant {
 // ===========================================
 
 model TenantModule {
-  id          String   @id @default(uuid())
-  tenantId    String
-  tenant      Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  moduleCode  String   // '@customers' | '@orders' | '@products' | '@quotes' | '@stock' | '@calendar' | etc.
-  isEnabled   Boolean  @default(true)
-  config      Json     @default("{}")
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id         String   @id @default(uuid())
+  tenantId   String
+  tenant     Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  moduleCode String // '@customers' | '@orders' | '@products' | '@quotes' | '@stock' | '@calendar' | etc.
+  isEnabled  Boolean  @default(true)
+  config     Json     @default("{}")
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 
   @@unique([tenantId, moduleCode])
   @@index([tenantId])
   @@map("tenant_modules")
+}
+
+// ===========================================
+// SUBMODULE CONFIGURATION (per tenant)
+// ===========================================
+
+model TenantSubmodule {
+  id            String    @id @default(uuid())
+  tenantId      String
+  moduleCode    String // Parent module code (e.g., 'CRM')
+  submoduleCode String // Submodule code (e.g., 'CRM_SEGMENTS')
+  isEnabled     Boolean   @default(false)
+  enabledAt     DateTime?
+  enabledById   String? // User who enabled this submodule
+  enabledBy     User?     @relation("SubmodulesEnabledBy", fields: [enabledById], references: [id])
+  config        Json? // Optional submodule-specific configuration
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@unique([tenantId, moduleCode, submoduleCode])
+  @@index([tenantId])
+  @@index([moduleCode])
+  @@index([enabledById])
+  @@map("tenant_submodules")
+}
+
+// ===========================================
+// PRICING SYSTEM (module and submodule prices)
+// ===========================================
+
+model ModulePrice {
+  id           String   @id @default(uuid())
+  moduleCode   String   @unique // 'CRM', 'ORDERS', 'PRODUCTS', etc.
+  moduleName   String // Human-readable name
+  description  String? // Module description
+  basePrice    Decimal  @db.Decimal(10, 2) // Monthly price
+  currency     String   @default("PLN")
+  isActive     Boolean  @default(true)
+  displayOrder Int      @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  submodules SubmodulePrice[]
+
+  @@index([moduleCode])
+  @@index([isActive])
+  @@map("module_prices")
+}
+
+model SubmodulePrice {
+  id            String      @id @default(uuid())
+  moduleCode    String // Parent module code
+  modulePrice   ModulePrice @relation(fields: [moduleCode], references: [moduleCode], onDelete: Cascade)
+  submoduleCode String // e.g., 'CRM_SEGMENTS'
+  submoduleName String // Human-readable name
+  description   String? // Submodule description
+  price         Decimal     @db.Decimal(10, 2) // Additional monthly price (0 if included in base)
+  isIncluded    Boolean     @default(false) // true if included in module base price
+  currency      String      @default("PLN")
+  isActive      Boolean     @default(true)
+  displayOrder  Int         @default(0)
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  @@unique([moduleCode, submoduleCode])
+  @@index([moduleCode])
+  @@index([isActive])
+  @@map("submodule_prices")
 }
 
 // ===========================================
@@ -63,12 +145,12 @@ model FieldConfig {
   id           String   @id @default(uuid())
   tenantId     String
   tenant       Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  entityType   String   // 'customer' | 'order' | 'product' | 'quote'
-  fieldName    String   // e.g., 'phone', 'nip', 'deliveryAddress'
+  entityType   String // 'customer' | 'order' | 'product' | 'quote'
+  fieldName    String // e.g., 'phone', 'nip', 'deliveryAddress'
   isVisible    Boolean  @default(true)
   isRequired   Boolean  @default(false)
   displayOrder Int      @default(0)
-  label        String?  // Custom label override
+  label        String? // Custom label override
   config       Json     @default("{}")
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
@@ -84,18 +166,20 @@ model FieldConfig {
 // ===========================================
 
 model WorkflowTrigger {
-  id          String   @id @default(uuid())
-  tenantId    String
-  tenant      Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  code        String   // e.g., 'order.new.sms_admin'
-  name        String   // Human-readable name
-  eventType   String   // 'order.created' | 'order.status_changed' | 'customer.created' | etc.
-  actionType  String   // 'sms' | 'email' | 'webhook' | 'create_entity'
-  actionConfig Json    @default("{}") // Template, recipient config, etc.
-  conditions  Json     @default("{}") // When to trigger (status = 'ready', etc.)
-  isEnabled   Boolean  @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id           String   @id @default(uuid())
+  tenantId     String
+  tenant       Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  code         String // e.g., 'order.new.sms_admin'
+  name         String // Human-readable name
+  eventType    String // 'order.created' | 'order.status_changed' | 'customer.created' | etc.
+  actionType   String // 'sms' | 'email' | 'webhook' | 'create_entity'
+  actionConfig Json     @default("{}") // Template, recipient config, etc.
+  conditions   Json     @default("{}") // When to trigger (status = 'ready', etc.)
+  isEnabled    Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  executions WorkflowExecution[]
 
   @@unique([tenantId, code])
   @@index([tenantId])
@@ -104,20 +188,37 @@ model WorkflowTrigger {
   @@map("workflow_triggers")
 }
 
+model WorkflowExecution {
+  id         String           @id @default(uuid())
+  triggerId  String
+  trigger    WorkflowTrigger  @relation(fields: [triggerId], references: [id], onDelete: Cascade)
+  tenantId   String
+  eventId    String
+  status     String // 'SUCCESS' | 'FAILED' | 'PENDING'
+  error      String?
+  executedAt DateTime         @default(now())
+
+  @@index([triggerId])
+  @@index([tenantId])
+  @@index([executedAt])
+  @@map("workflow_executions")
+}
+
 // ===========================================
 // EVENT LOG (audit trail per tenant)
 // ===========================================
 
 model EventLog {
-  id          String   @id @default(uuid())
-  tenantId    String
-  tenant      Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  eventType   String   // 'order.created', 'order.status_changed', etc.
-  entityType  String   // 'order', 'customer', 'product', 'quote'
-  entityId    String
-  userId      String?
-  payload     Json     @default("{}")
-  createdAt   DateTime @default(now())
+  id         String   @id @default(uuid())
+  tenantId   String
+  tenant     Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  eventType  String // 'order.created', 'order.status_changed', etc.
+  entityType String // 'order', 'customer', 'product', 'quote'
+  entityId   String
+  userId     String?
+  payload    Json     @default("{}")
+  metadata   Json?    // version, correlationId, causationId, context
+  createdAt  DateTime @default(now())
 
   @@index([tenantId])
   @@index([eventType])
@@ -126,43 +227,142 @@ model EventLog {
   @@map("event_logs")
 }
 
+// ===========================================
+// USER ROLES ENUM
+// ===========================================
+
+enum UserRole {
+  OWNER // Właściciel - pełne uprawnienia
+  ADMIN // Administrator
+  MANAGER // Manager zespołu
+  EMPLOYEE // Pracownik
+  VIEWER // Tylko podgląd
+  PLATFORM_ADMIN // Administrator platformy (super admin)
+}
+
 model User {
-  id        String    @id @default(uuid())
-  email     String    @unique
-  password  String
-  name      String?
-  phone     String?
-  tenantId  String?
-  tenant    Tenant?   @relation(fields: [tenantId], references: [id])
-  role      String    @default("user")
-  active    Boolean   @default(true)
-  lastLogin DateTime?
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
+  id String @id @default(uuid())
 
-  orders    Order[]
-  quotes    Quote[]
+  // === TENANT ===
+  tenantId String?
+  tenant   Tenant? @relation(fields: [tenantId], references: [id])
 
+  // === LOGOWANIE ===
+  email        String  @unique
+  phone        String?
+  password     String
+  mustChangePw Boolean @default(true) // Wymuszenie zmiany hasła przy pierwszym logowaniu
+
+  // === DANE OSOBOWE ===
+  name      String? // Pełna nazwa (backward compatibility)
+  firstName String? // Imię
+  lastName  String? // Nazwisko
+  avatar    String? // URL lub base64
+
+  // === ROLA ===
+  role        UserRole @default(EMPLOYEE)
+  permissions String[] @default([]) // Granularne uprawnienia ['crm:view', 'orders:create']
+  customRole  String? // Własna rola (jeśli nie standardowa)
+
+  // === STATUS ===
+  active       Boolean   @default(true)
+  lastLogin    DateTime?
+  failedLogins Int       @default(0)
+  lockedUntil  DateTime?
+
+  // === META ===
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // === RELACJE ===
+  orders              Order[]
+  quotes              Quote[]
+  passwordResetTokens PasswordResetToken[]
+  modulePermissions   UserModulePermission[] @relation("ModulePermissions")
+  submodulesEnabled   TenantSubmodule[]      @relation("SubmodulesEnabledBy")
+
+  // Nowe moduly
+  branches     UserBranch[]
+  measurements Measurement[]
+
+  @@unique([tenantId, email])
   @@index([tenantId])
+  @@index([role])
+  @@index([email])
   @@map("users")
 }
 
-model Customer {
-  id          String   @id @default(uuid())
-  tenantId    String
-  tenant      Tenant   @relation(fields: [tenantId], references: [id])
-  name        String
-  email       String?
-  phone       String?
-  company     String?
-  address     Json?
-  notes       String?
-  tags        String[]
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+// ===========================================
+// USER PERMISSIONS PER MODULE
+// ===========================================
 
-  orders      Order[]
-  quotes      Quote[]
+model UserModulePermission {
+  id         String   @id @default(uuid())
+  userId     String
+  user       User     @relation("ModulePermissions", fields: [userId], references: [id], onDelete: Cascade)
+  moduleCode String // 'CRM', 'ORDERS', 'PRODUCTS', etc.
+  canRead    Boolean  @default(true)
+  canWrite   Boolean  @default(false)
+  canDelete  Boolean  @default(false)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([userId, moduleCode])
+  @@index([userId])
+  @@index([moduleCode])
+  @@map("user_module_permissions")
+}
+
+// ===========================================
+// ROLE DEFINITIONS (Custom roles per tenant)
+// ===========================================
+
+model RoleDefinition {
+  id       String @id @default(uuid())
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  // === IDENTYFIKACJA ===
+  name        String
+  description String?
+  color       String  @default("#6B7280") // Tailwind gray-500
+
+  // === UPRAWNIENIA ===
+  permissions String[] // Lista granularnych uprawnień ['crm:view', 'orders:create']
+
+  // === DZIEDZICZENIE ===
+  inheritsFrom String? // ID innej roli (opcjonalnie)
+
+  // === STATUS ===
+  isActive  Boolean @default(true)
+  sortOrder Int     @default(0)
+
+  // === META ===
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([tenantId, name])
+  @@index([tenantId])
+  @@index([isActive])
+  @@map("role_definitions")
+}
+
+model Customer {
+  id        String   @id @default(uuid())
+  tenantId  String
+  tenant    Tenant   @relation(fields: [tenantId], references: [id])
+  name      String
+  email     String?
+  phone     String?
+  company   String?
+  address   Json?
+  notes     String?
+  tags      String[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  orders Order[]
+  quotes Quote[]
 
   @@index([tenantId])
   @@index([email])
@@ -185,8 +385,8 @@ model Product {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  orderItems  OrderItem[]
-  quoteItems  QuoteItem[]
+  orderItems OrderItem[]
+  quoteItems QuoteItem[]
 
   @@unique([tenantId, sku])
   @@index([tenantId])
@@ -194,66 +394,81 @@ model Product {
 }
 
 model Order {
-  id          String      @id @default(uuid())
+  id          String   @id @default(uuid())
   tenantId    String
-  tenant      Tenant      @relation(fields: [tenantId], references: [id])
+  tenant      Tenant   @relation(fields: [tenantId], references: [id])
   orderNumber String
   customerId  String
-  customer    Customer    @relation(fields: [customerId], references: [id])
+  customer    Customer @relation(fields: [customerId], references: [id])
   userId      String?
-  user        User?       @relation(fields: [userId], references: [id])
-  status      String      @default("new")
-  totalNet    Decimal     @db.Decimal(10, 2)
-  totalGross  Decimal     @db.Decimal(10, 2)
-  vatRate     Decimal     @default(23) @db.Decimal(5, 2)
+  user        User?    @relation(fields: [userId], references: [id])
+  status      String   @default("new")
+  totalNet    Decimal  @db.Decimal(10, 2)
+  totalGross  Decimal  @db.Decimal(10, 2)
+  vatRate     Decimal  @default(23) @db.Decimal(5, 2)
   notes       String?
   metadata    Json?
-  createdAt   DateTime    @default(now())
-  updatedAt   DateTime    @updatedAt
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
-  items       OrderItem[]
+  // Nowe pola - oddzial i lokalizacja
+  branchId   String?
+  branch     Branch?   @relation(fields: [branchId], references: [id])
+  locationId String?
+  location   Location? @relation(fields: [locationId], references: [id])
+
+  // Rozszerzenia z innych aplikacji
+  orderType   String?   // DAILY, FUNERAL, SERVICE (z ebukieteria)
+  qrCode      String?   // QR kod zamowienia (z wedliny)
+  pickupDate  DateTime? // Data odbioru
+  pickupTime  String?   // Godzina odbioru "14:30"
+
+  items        OrderItem[]
+  measurements Measurement[]
 
   @@unique([tenantId, orderNumber])
   @@index([tenantId])
   @@index([customerId])
   @@index([status])
+  @@index([branchId])
+  @@index([locationId])
   @@map("orders")
 }
 
 model OrderItem {
-  id          String   @id @default(uuid())
-  orderId     String
-  order       Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  productId   String
-  product     Product  @relation(fields: [productId], references: [id])
-  quantity    Int
-  unitPrice   Decimal  @db.Decimal(10, 2)
-  totalPrice  Decimal  @db.Decimal(10, 2)
+  id         String  @id @default(uuid())
+  orderId    String
+  order      Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productId  String
+  product    Product @relation(fields: [productId], references: [id])
+  quantity   Int
+  unitPrice  Decimal @db.Decimal(10, 2)
+  totalPrice Decimal @db.Decimal(10, 2)
 
   @@index([orderId])
   @@map("order_items")
 }
 
 model Quote {
-  id          String      @id @default(uuid())
+  id          String    @id @default(uuid())
   tenantId    String
-  tenant      Tenant      @relation(fields: [tenantId], references: [id])
+  tenant      Tenant    @relation(fields: [tenantId], references: [id])
   quoteNumber String
   customerId  String
-  customer    Customer    @relation(fields: [customerId], references: [id])
+  customer    Customer  @relation(fields: [customerId], references: [id])
   userId      String?
-  user        User?       @relation(fields: [userId], references: [id])
-  status      String      @default("draft")
+  user        User?     @relation(fields: [userId], references: [id])
+  status      String    @default("draft")
   validUntil  DateTime?
-  totalNet    Decimal     @db.Decimal(10, 2)
-  totalGross  Decimal     @db.Decimal(10, 2)
-  vatRate     Decimal     @default(23) @db.Decimal(5, 2)
+  totalNet    Decimal   @db.Decimal(10, 2)
+  totalGross  Decimal   @db.Decimal(10, 2)
+  vatRate     Decimal   @default(23) @db.Decimal(5, 2)
   notes       String?
   metadata    Json?
-  createdAt   DateTime    @default(now())
-  updatedAt   DateTime    @updatedAt
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 
-  items       QuoteItem[]
+  items QuoteItem[]
 
   @@unique([tenantId, quoteNumber])
   @@index([tenantId])
@@ -263,14 +478,14 @@ model Quote {
 }
 
 model QuoteItem {
-  id          String   @id @default(uuid())
-  quoteId     String
-  quote       Quote    @relation(fields: [quoteId], references: [id], onDelete: Cascade)
-  productId   String
-  product     Product  @relation(fields: [productId], references: [id])
-  quantity    Int
-  unitPrice   Decimal  @db.Decimal(10, 2)
-  totalPrice  Decimal  @db.Decimal(10, 2)
+  id         String  @id @default(uuid())
+  quoteId    String
+  quote      Quote   @relation(fields: [quoteId], references: [id], onDelete: Cascade)
+  productId  String
+  product    Product @relation(fields: [productId], references: [id])
+  quantity   Int
+  unitPrice  Decimal @db.Decimal(10, 2)
+  totalPrice Decimal @db.Decimal(10, 2)
 
   @@index([quoteId])
   @@map("quote_items")
@@ -281,19 +496,1914 @@ model QuoteItem {
 // ===========================================
 
 model ApiKey {
-  id          String   @id @default(uuid())
-  tenantId    String
-  name        String   // Company name / key name
-  service     String   // 'openrouter' | 'openai' | 'anthropic' | etc.
-  apiKey      String   // Encrypted API key
-  isActive    Boolean  @default(true)
-  usageCount  Int      @default(0)
-  lastUsedAt  DateTime?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id         String    @id @default(uuid())
+  tenantId   String
+  name       String // Company name / key name
+  service    String // 'openrouter' | 'openai' | 'anthropic' | etc.
+  apiKey     String // Encrypted API key
+  isActive   Boolean   @default(true)
+  usageCount Int       @default(0)
+  lastUsedAt DateTime?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
 
   @@unique([tenantId, service])
   @@index([tenantId])
   @@index([service])
   @@map("api_keys")
+}
+
+// ===========================================
+// PASSWORD RESET TOKENS
+// ===========================================
+
+model PasswordResetToken {
+  id        String    @id @default(uuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  token     String    @unique // Random token (UUID or hash)
+  expiresAt DateTime // Expire after 1 hour
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId])
+  @@index([token])
+  @@map("password_reset_tokens")
+}
+
+// ===========================================
+// AUDIT LOG (Detailed audit trail)
+// ===========================================
+
+enum AuditAction {
+  // CRUD
+  CREATED
+  UPDATED
+  DELETED
+
+  // Status
+  STATUS_CHANGED
+
+  // Assignment
+  ASSIGNED
+  UNASSIGNED
+
+  // Special
+  VIEWED
+  EXPORTED
+  IMPORTED
+  SENT
+  APPROVED
+  REJECTED
+
+  // Auth
+  LOGIN
+  LOGOUT
+  PASSWORD_CHANGED
+  PASSWORD_RESET
+}
+
+model AuditLog {
+  id       String @id @default(uuid())
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  // === KTO ===
+  userId    String?
+  userName  String? // Snapshot (na wypadek usunięcia usera)
+  userIp    String? // IP address
+  userAgent String? // Browser/device info
+
+  // === CO ===
+  action     AuditAction
+  entityType String // 'Customer', 'Order', 'Quote', etc.
+  entityId   String
+  entityName String? // np. "ZAM-2025-0001"
+
+  // === SZCZEGÓŁY ===
+  oldValues Json? // Poprzednie wartości
+  newValues Json? // Nowe wartości
+  changes   Json? // Lista zmienionych pól [{field, from, to}]
+  metadata  Json? // Dodatkowe dane
+
+  // === KIEDY ===
+  createdAt DateTime @default(now())
+
+  @@index([tenantId])
+  @@index([entityType, entityId])
+  @@index([userId])
+  @@index([action])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
+
+// ===========================================
+// BRANCHES - Oddzialy firmy (z tapparella)
+// ===========================================
+
+model Branch {
+  id       String @id @default(uuid())
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  // Identyfikacja
+  code String // GOR, MAS, SZC
+  name String // Gorzow, Maszewo, Szczecin
+
+  // Dane kontaktowe
+  address    String?
+  city       String?
+  postalCode String?
+  phone      String?
+  email      String?
+
+  // Status
+  isActive  Boolean @default(true)
+  isDefault Boolean @default(false)
+
+  // Metadane
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relacje
+  users         UserBranch[]
+  orders        Order[]
+  postalPrefixes BranchPostalPrefix[]
+
+  @@unique([tenantId, code])
+  @@index([tenantId])
+  @@map("branches")
+}
+
+model UserBranch {
+  id         String   @id @default(uuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  branchId   String
+  branch     Branch   @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  assignedAt DateTime @default(now())
+
+  @@unique([userId, branchId])
+  @@index([userId])
+  @@index([branchId])
+  @@map("user_branches")
+}
+
+model BranchPostalPrefix {
+  id          String   @id @default(uuid())
+  branchId    String
+  branch      Branch   @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  prefix      String // "66-40", "70-", "71-"
+  description String? // "Gorzow i okolice"
+  createdAt   DateTime @default(now())
+
+  @@unique([branchId, prefix])
+  @@index([branchId])
+  @@map("branch_postal_prefixes")
+}
+
+// ===========================================
+// LOCATIONS - Punkty odbioru (z ebukieteria, wedliny)
+// ===========================================
+
+enum LocationType {
+  SHOP      // Sklep stacjonarny
+  WAREHOUSE // Magazyn
+  PICKUP    // Punkt odbioru
+  SERVICE   // Punkt serwisowy
+}
+
+model Location {
+  id       String @id @default(uuid())
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  // Identyfikacja
+  code String? // LOK-001
+  name String // Sklep Gorzow Centrum
+  type LocationType @default(SHOP)
+
+  // Adres
+  address    String
+  city       String?
+  postalCode String?
+  country    String  @default("PL")
+
+  // Geolokalizacja
+  latitude      Float?
+  longitude     Float?
+  googleMapsUrl String?
+
+  // Kontakt
+  phone String?
+  email String?
+
+  // Godziny otwarcia (JSON)
+  openingHours Json? // {"mon":"8:00-16:00","tue":"8:00-16:00",...}
+  closedDates  Json? // ["2024-12-25","2024-12-26"]
+
+  // Ustawienia
+  prepTimeMinutes Int     @default(30) // Czas przygotowania zamowienia
+  isActive        Boolean @default(true)
+  isDefault       Boolean @default(false)
+  sortOrder       Int     @default(0)
+
+  // Metadane
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relacje
+  orders Order[]
+
+  @@unique([tenantId, code])
+  @@index([tenantId])
+  @@index([type])
+  @@map("locations")
+}
+
+// ===========================================
+// DICTIONARIES - Slowniki systemowe (z inconcept, tapparella)
+// ===========================================
+
+model Dictionary {
+  id       String  @id @default(uuid())
+  tenantId String? // null = systemowy, wartosci = per-tenant
+  tenant   Tenant? @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  // Identyfikacja
+  type String // "order_status", "product_category", "unit", etc.
+  code String // "new", "in_progress", "completed"
+
+  // Etykiety
+  label   String // "Nowe", "W trakcie", "Zakonczone"
+  labelEn String? // "New", "In Progress", "Completed"
+
+  // Wyglad
+  color String? // "#10B981" (hex) lub "green" (nazwa)
+  icon  String? // "clock", "check", "x"
+
+  // Metadane
+  description String? // Opis wartosci
+  metadata    Json? // Dodatkowe dane JSON
+
+  // Ustawienia
+  isDefault Boolean @default(false) // Domyslna wartosc dla typu
+  isSystem  Boolean @default(false) // Systemowa (nie mozna usunac)
+  isActive  Boolean @default(true)
+  sortOrder Int     @default(0)
+
+  // Daty
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([tenantId, type, code])
+  @@index([tenantId])
+  @@index([type])
+  @@index([isActive])
+  @@map("dictionaries")
+}
+
+// ===========================================
+// MEASUREMENTS - Pomiary (z tapparella)
+// ===========================================
+
+enum MeasurementStatus {
+  SCHEDULED   // Zaplanowany
+  IN_PROGRESS // W trakcie
+  COMPLETED   // Zakonczony
+  CANCELLED   // Anulowany
+}
+
+model Measurement {
+  id       String @id @default(uuid())
+  tenantId String
+  orderId  String
+  order    Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  // Technik wykonujacy pomiar
+  technicianId String
+  technician   User   @relation(fields: [technicianId], references: [id])
+
+  // Terminy
+  scheduledAt DateTime? // Zaplanowana data pomiaru
+  startedAt   DateTime? // Kiedy rozpoczeto
+  completedAt DateTime? // Kiedy zakonczono
+
+  // Status
+  status MeasurementStatus @default(SCHEDULED)
+
+  // Dokumentacja
+  photos String[] // URLs do zdjec
+  notes  String? // Notatki z pomiaru
+
+  // Metadane
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relacje
+  items MeasurementItem[]
+
+  @@index([tenantId])
+  @@index([orderId])
+  @@index([technicianId])
+  @@index([status])
+  @@map("measurements")
+}
+
+model MeasurementItem {
+  id            String      @id @default(uuid())
+  measurementId String
+  measurement   Measurement @relation(fields: [measurementId], references: [id], onDelete: Cascade)
+
+  // Lokalizacja w budynku
+  location String // "Salon okno 1", "Sypialnia drzwi balkonowe"
+  floor    String? // "Parter", "1 pietro"
+
+  // Produkt
+  product     String // "Moskitiera ramowa", "Roleta wolnowiszaca"
+  productCode String? // Kod z cennika
+
+  // Wymiary (w mm)
+  widthMm  Int
+  heightMm Int
+  depthMm  Int? // Glebokosc (np. dla rolety)
+
+  // Ilosc
+  quantity Int @default(1)
+
+  // Opcje
+  color     String? // Kolor
+  mountType String? // Typ montazu: na ramie, w oscieze, itp.
+  driveType String? // Typ napdu: reczny, elektryczny
+
+  // Dodatkowe
+  notes  String?
+  photos String[] // Zdjecia tej pozycji
+
+  // Metadane
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+
+  @@index([measurementId])
+  @@map("measurement_items")
+}
+
+// ===========================================
+// @WMS - WAREHOUSE MANAGEMENT SYSTEM
+// ===========================================
+
+enum WarehouseLocationType {
+  WAREHOUSE // Magazyn główny
+  ZONE      // Strefa (np. strefa A, B)
+  RACK      // Regał
+  SHELF     // Półka
+  BIN       // Kuweta/Pozycja
+}
+
+model WarehouseLocation {
+  id       String @id @default(uuid())
+  tenantId String
+
+  // Hierarchia
+  parentId String?
+  parent   WarehouseLocation?  @relation("LocationHierarchy", fields: [parentId], references: [id])
+  children WarehouseLocation[] @relation("LocationHierarchy")
+
+  // Identyfikacja
+  code    String               // WH-A, WH-A-01, WH-A-01-1
+  name    String               // Magazyn A, Regał 01, Półka 1
+  type    WarehouseLocationType @default(BIN)
+  barcode String?              // Kod kreskowy lokalizacji
+
+  // Wymiary (opcjonalne, dla planowania)
+  widthCm  Int?
+  heightCm Int?
+  depthCm  Int?
+
+  // Pojemność
+  maxWeight Decimal? @db.Decimal(10, 2) // Max waga w kg
+  maxItems  Int?     // Max ilość pozycji
+
+  // Status
+  isActive     Boolean @default(true)
+  isPickable   Boolean @default(true) // Czy można z niej pobierać
+  isReceivable Boolean @default(true) // Czy można na nią przyjmować
+  sortOrder    Int     @default(0)
+
+  // Metadane
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relacje
+  containers          Container[]
+  documentItems       WarehouseDocumentItem[]
+  inventories         InventoryCount[]
+  documentsAsSource   WarehouseDocument[] @relation("SourceLocation")
+  documentsAsTarget   WarehouseDocument[] @relation("TargetLocation")
+
+  @@unique([tenantId, code])
+  @@index([tenantId])
+  @@index([parentId])
+  @@index([type])
+  @@index([barcode])
+  @@map("warehouse_locations")
+}
+
+enum WarehouseDocumentType {
+  PZ     // Przyjęcie zewnętrzne (zakup)
+  WZ     // Wydanie zewnętrzne (sprzedaż)
+  PW     // Przyjęcie wewnętrzne (produkcja)
+  RW     // Rozchód wewnętrzny (produkcja)
+  MM     // Przesunięcie międzymagazynowe
+  INV    // Inwentaryzacja (korekta)
+  RETURN // Zwrot
+}
+
+enum WarehouseDocumentStatus {
+  DRAFT     // Szkic
+  PENDING   // Oczekuje na realizację
+  IN_PROGRESS // W trakcie
+  COMPLETED // Zakończony
+  CANCELLED // Anulowany
+}
+
+model WarehouseDocument {
+  id       String @id @default(uuid())
+  tenantId String
+
+  // Numer dokumentu
+  documentNumber String // WZ/2024/001, PZ/2024/001
+
+  // Typ i status
+  type   WarehouseDocumentType
+  status WarehouseDocumentStatus @default(DRAFT)
+
+  // Lokalizacje (dla MM - przesunięcie)
+  sourceLocationId String?
+  sourceLocation   WarehouseLocation? @relation("SourceLocation", fields: [sourceLocationId], references: [id])
+  targetLocationId String?
+  targetLocation   WarehouseLocation? @relation("TargetLocation", fields: [targetLocationId], references: [id])
+
+  // Powiązania
+  orderId    String? // Powiązane zamówienie
+  supplierId String? // Dostawca (dla PZ)
+
+  // Daty
+  documentDate DateTime @default(now()) // Data dokumentu
+  expectedDate DateTime? // Oczekiwana data realizacji
+  completedAt  DateTime? // Data zakończenia
+
+  // Odpowiedzialny
+  createdById   String?
+  confirmedById String?
+  confirmedAt   DateTime?
+
+  // Notatki
+  notes         String?
+  externalRef   String? // Numer dokumentu zewnętrznego (faktura, WZ dostawcy)
+  deliveryNote  String? // Numer listu przewozowego
+
+  // Metadane
+  metadata  Json?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relacje
+  items WarehouseDocumentItem[]
+
+  @@unique([tenantId, documentNumber])
+  @@index([tenantId])
+  @@index([type])
+  @@index([status])
+  @@index([documentDate])
+  @@index([orderId])
+  @@map("warehouse_documents")
+}
+
+model WarehouseDocumentItem {
+  id         String            @id @default(uuid())
+  documentId String
+  document   WarehouseDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  // Produkt
+  productId String
+  productName String? // Snapshot nazwy
+  productSku  String? // Snapshot SKU
+
+  // Lokalizacja docelowa/źródłowa (dla pozycji)
+  locationId String?
+  location   WarehouseLocation? @relation(fields: [locationId], references: [id])
+
+  // Ilości
+  expectedQuantity Int     @default(0) // Oczekiwana ilość
+  actualQuantity   Int     @default(0) // Faktyczna ilość (po realizacji)
+  unit             String  @default("szt")
+
+  // Numery seryjne/partie (opcjonalnie)
+  batchNumber  String?
+  serialNumber String?
+  expiryDate   DateTime?
+
+  // Status pozycji
+  isProcessed Boolean @default(false)
+  processedAt DateTime?
+  processedById String?
+
+  // Notatki
+  notes String?
+
+  // Metadane
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+
+  @@index([documentId])
+  @@index([productId])
+  @@index([locationId])
+  @@index([batchNumber])
+  @@map("warehouse_document_items")
+}
+
+enum InventoryCountStatus {
+  DRAFT      // Przygotowanie
+  IN_PROGRESS // W trakcie liczenia
+  REVIEW     // Do weryfikacji
+  APPROVED   // Zatwierdzona
+  CANCELLED  // Anulowana
+}
+
+model InventoryCount {
+  id       String @id @default(uuid())
+  tenantId String
+
+  // Numer inwentaryzacji
+  countNumber String // INW/2024/001
+
+  // Status
+  status InventoryCountStatus @default(DRAFT)
+
+  // Zakres inwentaryzacji
+  locationId   String?
+  location     WarehouseLocation? @relation(fields: [locationId], references: [id])
+  categoryCode String? // Tylko produkty z danej kategorii
+
+  // Daty
+  plannedDate  DateTime? // Planowana data
+  startedAt    DateTime?
+  completedAt  DateTime?
+
+  // Odpowiedzialny
+  createdById  String?
+  assignedToId String?
+  approvedById String?
+  approvedAt   DateTime?
+
+  // Podsumowanie
+  totalExpected Int @default(0)
+  totalCounted  Int @default(0)
+  totalVariance Int @default(0)
+  varianceValue Decimal? @db.Decimal(10, 2)
+
+  // Notatki
+  notes String?
+
+  // Metadane
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relacje
+  items InventoryCountItem[]
+
+  @@unique([tenantId, countNumber])
+  @@index([tenantId])
+  @@index([status])
+  @@index([locationId])
+  @@map("inventory_counts")
+}
+
+model InventoryCountItem {
+  id      String         @id @default(uuid())
+  countId String
+  count   InventoryCount @relation(fields: [countId], references: [id], onDelete: Cascade)
+
+  // Produkt
+  productId   String
+  productName String? // Snapshot
+  productSku  String? // Snapshot
+
+  // Lokalizacja szczegółowa
+  locationCode String?
+
+  // Ilości
+  expectedQty Int @default(0) // Stan systemowy
+  countedQty  Int @default(0) // Stan zliczony
+  variance    Int @default(0) // Różnica (countedQty - expectedQty)
+
+  // Wartość różnicy
+  unitPrice     Decimal? @db.Decimal(10, 2)
+  varianceValue Decimal? @db.Decimal(10, 2)
+
+  // Numer seryjny/partia
+  batchNumber String?
+
+  // Kto liczył
+  countedById String?
+  countedAt   DateTime?
+
+  // Notatki
+  notes String?
+
+  // Metadane
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+
+  @@index([countId])
+  @@index([productId])
+  @@map("inventory_count_items")
+}
+
+enum ContainerType {
+  BOX      // Karton
+  BIN      // Kuweta plastikowa
+  PALLET   // Paleta
+  TOTE     // Pojemnik transportowy
+  CRATE    // Skrzynia
+}
+
+enum ContainerStatus {
+  EMPTY      // Pusty
+  PARTIAL    // Częściowo wypełniony
+  FULL       // Pełny
+  IN_TRANSIT // W transporcie
+  RESERVED   // Zarezerwowany
+}
+
+model Container {
+  id       String @id @default(uuid())
+  tenantId String
+
+  // Identyfikacja
+  code    String        // KUW-001, PAL-001
+  barcode String?       // Kod kreskowy
+  type    ContainerType @default(BIN)
+  status  ContainerStatus @default(EMPTY)
+
+  // Lokalizacja aktualna
+  locationId String?
+  location   WarehouseLocation? @relation(fields: [locationId], references: [id])
+
+  // Wymiary
+  widthCm  Int?
+  heightCm Int?
+  depthCm  Int?
+
+  // Pojemność
+  maxWeight  Decimal? @db.Decimal(10, 2)
+  maxItems   Int?
+  currentWeight Decimal? @db.Decimal(10, 2)
+  currentItems  Int      @default(0)
+
+  // Powiązania
+  orderId    String? // Powiązane z zamówieniem
+  customerId String? // Powiązane z klientem
+
+  // Status
+  isActive Boolean @default(true)
+  isReusable Boolean @default(true)
+
+  // Notatki
+  notes String?
+  color String? // Kolor kuwety (dla wizualizacji)
+
+  // Metadane
+  lastUsedAt DateTime?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  // Relacje
+  contents ContainerContent[]
+
+  @@unique([tenantId, code])
+  @@index([tenantId])
+  @@index([barcode])
+  @@index([locationId])
+  @@index([status])
+  @@index([orderId])
+  @@map("containers")
+}
+
+model ContainerContent {
+  id          String    @id @default(uuid())
+  containerId String
+  container   Container @relation(fields: [containerId], references: [id], onDelete: Cascade)
+
+  // Produkt
+  productId   String
+  productName String? // Snapshot
+  productSku  String? // Snapshot
+
+  // Ilość
+  quantity Int    @default(1)
+  unit     String @default("szt")
+
+  // Numery
+  batchNumber  String?
+  serialNumber String?
+  expiryDate   DateTime?
+
+  // Metadane
+  addedAt   DateTime @default(now())
+  addedById String?
+
+  @@index([containerId])
+  @@index([productId])
+  @@map("container_contents")
+}
+
+// ===========================================
+// @PRODUCTION - PLANOWANIE PRODUKCJI
+// ===========================================
+
+enum ProductionPlanStatus {
+  DRAFT       // Szkic
+  CONFIRMED   // Potwierdzone
+  IN_PROGRESS // W realizacji
+  COMPLETED   // Zakończone
+  CANCELLED   // Anulowane
+}
+
+model ProductionPlan {
+  id       String @id @default(uuid())
+  tenantId String
+
+  // Identyfikacja
+  planNumber String // PROD/2024/001
+  planDate   DateTime // Data produkcji
+
+  // Status
+  status ProductionPlanStatus @default(DRAFT)
+
+  // Podsumowanie
+  totalItems      Int     @default(0)
+  totalWeight     Decimal? @db.Decimal(10, 3) // Suma wagi w kg
+  totalQuantity   Int     @default(0) // Suma sztuk
+  completedItems  Int     @default(0)
+
+  // Daty
+  startedAt   DateTime?
+  completedAt DateTime?
+
+  // Odpowiedzialny
+  createdById   String?
+  confirmedById String?
+  confirmedAt   DateTime?
+
+  // Notatki
+  notes String?
+
+  // Metadane
+  metadata  Json?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relacje
+  items ProductionPlanItem[]
+
+  @@unique([tenantId, planNumber])
+  @@index([tenantId])
+  @@index([planDate])
+  @@index([status])
+  @@map("production_plans")
+}
+
+enum ProductionItemStatus {
+  PENDING     // Oczekuje
+  IN_PROGRESS // W trakcie
+  COMPLETED   // Zakończone
+  SKIPPED     // Pominięte
+}
+
+model ProductionPlanItem {
+  id     String         @id @default(uuid())
+  planId String
+  plan   ProductionPlan @relation(fields: [planId], references: [id], onDelete: Cascade)
+
+  // Produkt
+  productId   String
+  productName String? // Snapshot
+  productSku  String? // Snapshot
+
+  // Ilości zamówione (z zamówień)
+  orderedQuantity Int     @default(0) // Ilość zamówiona (szt)
+  orderedWeight   Decimal? @db.Decimal(10, 3) // Waga zamówiona (kg)
+  orderedUnit     String  @default("szt") // Jednostka zamówienia
+
+  // Ilości do produkcji (po konwersji)
+  targetQuantity Int     @default(0) // Ilość do wyprodukowania (szt)
+  targetWeight   Decimal? @db.Decimal(10, 3) // Waga do wyprodukowania (kg)
+  targetUnit     String  @default("szt") // Jednostka produkcji
+
+  // Ilości wyprodukowane
+  producedQuantity Int     @default(0)
+  producedWeight   Decimal? @db.Decimal(10, 3)
+
+  // Status
+  status ProductionItemStatus @default(PENDING)
+
+  // Powiązane zamówienia (JSON array of order IDs)
+  orderIds Json? // ["order-1", "order-2", ...]
+
+  // Wykonawca
+  assignedToId String?
+  startedAt    DateTime?
+  completedAt  DateTime?
+  completedById String?
+
+  // Notatki
+  notes String?
+
+  // Metadane
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+
+  @@index([planId])
+  @@index([productId])
+  @@index([status])
+  @@map("production_plan_items")
+}
+
+// ===========================================
+// UNIT CONVERSION - Konwersja jednostek
+// ===========================================
+
+model UnitConversion {
+  id       String @id @default(uuid())
+  tenantId String
+
+  // Produkt (może być null dla konwersji globalnych)
+  productId String?
+
+  // Konwersja
+  fromUnit       String  // "kg", "szt", "op", "kart"
+  toUnit         String  // "szt", "kg", "op", "kart"
+  conversionRate Decimal @db.Decimal(10, 6) // 1 kg = X szt
+
+  // Opis
+  description String? // "1 kg = 4 sztuki kiełbasy"
+
+  // Status
+  isActive  Boolean @default(true)
+  isDefault Boolean @default(false) // Domyślna konwersja dla produktu
+
+  // Metadane
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([tenantId, productId, fromUnit, toUnit])
+  @@index([tenantId])
+  @@index([productId])
+  @@index([fromUnit, toUnit])
+  @@map("unit_conversions")
+}
+
+// ===========================================
+// PREORDER SLOTS - Kalendarz pre-orderów
+// ===========================================
+
+enum PreorderSlotStatus {
+  OPEN      // Otwarty na zamówienia
+  FULL      // Pełny (osiągnięto limit)
+  CLOSED    // Zamknięty ręcznie
+  COMPLETED // Zrealizowany
+}
+
+model PreorderSlot {
+  id       String @id @default(uuid())
+  tenantId String
+
+  // Data slotu
+  slotDate DateTime @db.Date // Data dostawy/odbioru
+
+  // Limity
+  maxOrders     Int @default(50)  // Max liczba zamówień
+  maxQuantity   Int? // Max ilość produktów (opcjonalnie)
+  maxWeight     Decimal? @db.Decimal(10, 2) // Max waga (opcjonalnie)
+
+  // Aktualne wartości
+  currentOrders   Int     @default(0)
+  currentQuantity Int     @default(0)
+  currentWeight   Decimal? @db.Decimal(10, 2)
+
+  // Status
+  status PreorderSlotStatus @default(OPEN)
+
+  // Czas zamknięcia (ile dni przed slotDate)
+  closeBeforeDays Int @default(2) // Zamknij 2 dni przed
+
+  // Godziny odbioru (opcjonalnie)
+  pickupTimeStart String? // "08:00"
+  pickupTimeEnd   String? // "16:00"
+
+  // Kategorie produktów (opcjonalnie - tylko dla tych kategorii)
+  categoryIds Json? // ["cat-1", "cat-2"] lub null dla wszystkich
+
+  // Notatki
+  notes String?
+
+  // Metadane
+  closedAt   DateTime?
+  closedById String?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  // Relacje
+  orders PreorderSlotOrder[]
+
+  @@unique([tenantId, slotDate])
+  @@index([tenantId])
+  @@index([slotDate])
+  @@index([status])
+  @@map("preorder_slots")
+}
+
+model PreorderSlotOrder {
+  id     String        @id @default(uuid())
+  slotId String
+  slot   PreorderSlot  @relation(fields: [slotId], references: [id], onDelete: Cascade)
+
+  // Zamówienie
+  orderId     String
+  orderNumber String? // Snapshot
+
+  // Ilości
+  quantity Int     @default(0)
+  weight   Decimal? @db.Decimal(10, 2)
+
+  // Metadane
+  createdAt DateTime @default(now())
+
+  @@unique([slotId, orderId])
+  @@index([slotId])
+  @@index([orderId])
+  @@map("preorder_slot_orders")
+}
+
+// ===========================================
+// PRODUCTION RECIPE - Receptury (opcjonalne)
+// ===========================================
+
+model ProductionRecipe {
+  id       String @id @default(uuid())
+  tenantId String
+
+  // Produkt końcowy
+  productId   String
+  productName String? // Snapshot
+
+  // Nazwa receptury
+  name        String
+  description String?
+
+  // Wydajność
+  outputQuantity Int     @default(1)
+  outputUnit     String  @default("szt")
+  outputWeight   Decimal? @db.Decimal(10, 3)
+
+  // Czas produkcji (minuty)
+  productionTimeMinutes Int?
+
+  // Status
+  isActive  Boolean @default(true)
+  isDefault Boolean @default(false)
+
+  // Metadane
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relacje
+  ingredients ProductionRecipeIngredient[]
+
+  @@unique([tenantId, productId, name])
+  @@index([tenantId])
+  @@index([productId])
+  @@map("production_recipes")
+}
+
+model ProductionRecipeIngredient {
+  id       String           @id @default(uuid())
+  recipeId String
+  recipe   ProductionRecipe @relation(fields: [recipeId], references: [id], onDelete: Cascade)
+
+  // Składnik
+  ingredientProductId String
+  ingredientName      String? // Snapshot
+
+  // Ilość
+  quantity Decimal @db.Decimal(10, 4)
+  unit     String  @default("kg")
+
+  // Czy opcjonalny
+  isOptional Boolean @default(false)
+
+  // Metadane
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+
+  @@index([recipeId])
+  @@index([ingredientProductId])
+  @@map("production_recipe_ingredients")
+}
+
+// ===========================================
+// @PRICING - SYSTEM CENNIKÓW I MARŻ
+// ===========================================
+
+// Kategorie cenowe (hierarchiczne)
+model PriceCategory {
+  id       String @id @default(uuid())
+  tenantId String
+
+  // Hierarchia
+  parentId String?
+  parent   PriceCategory?  @relation("CategoryHierarchy", fields: [parentId], references: [id])
+  children PriceCategory[] @relation("CategoryHierarchy")
+
+  // Identyfikacja
+  code String // RETAIL, WHOLESALE, VIP
+  name String // Detaliczny, Hurtowy, VIP
+
+  // Opis
+  description String?
+
+  // Rabat domyślny dla kategorii
+  defaultDiscountPercent Decimal? @db.Decimal(5, 2) // np. 10% rabatu
+
+  // Status
+  isActive  Boolean @default(true)
+  sortOrder Int     @default(0)
+
+  // Metadane
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relacje
+  priceTables PriceTable[]
+  productCosts ProductCost[]
+
+  @@unique([tenantId, code])
+  @@index([tenantId])
+  @@index([parentId])
+  @@map("price_categories")
+}
+
+// Cenniki (z datami ważności)
+model PriceTable {
+  id       String @id @default(uuid())
+  tenantId String
+
+  // Identyfikacja
+  code String // CENNIK-2024-Q1, PROMO-SWIETA
+  name String // Cennik Q1 2024, Promocja świąteczna
+
+  // Opis
+  description String?
+
+  // Kategoria cenowa (opcjonalnie)
+  categoryId String?
+  category   PriceCategory? @relation(fields: [categoryId], references: [id])
+
+  // Waluta
+  currency String @default("PLN")
+
+  // Daty ważności
+  validFrom DateTime  @default(now())
+  validTo   DateTime?
+
+  // Priorytet (wyższy = ważniejszy przy nakładaniu się)
+  priority Int @default(0)
+
+  // Typ cennika
+  priceType PriceTableType @default(STANDARD)
+
+  // Status
+  isActive  Boolean @default(true)
+  isDefault Boolean @default(false) // Domyślny cennik
+
+  // Metadane
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relacje
+  entries PriceTableEntry[]
+
+  @@unique([tenantId, code])
+  @@index([tenantId])
+  @@index([categoryId])
+  @@index([validFrom, validTo])
+  @@index([isActive])
+  @@map("price_tables")
+}
+
+enum PriceTableType {
+  STANDARD   // Standardowy cennik
+  PROMOTION  // Cennik promocyjny
+  CONTRACT   // Cennik kontraktowy (dla klienta)
+  SEASONAL   // Cennik sezonowy
+  CLEARANCE  // Wyprzedaż
+}
+
+// Pozycje cennika
+model PriceTableEntry {
+  id           String     @id @default(uuid())
+  priceTableId String
+  priceTable   PriceTable @relation(fields: [priceTableId], references: [id], onDelete: Cascade)
+
+  // Produkt
+  productId   String
+  productSku  String? // Snapshot SKU
+  productName String? // Snapshot nazwy
+
+  // Ceny
+  priceNet   Decimal @db.Decimal(10, 2) // Cena netto
+  priceGross Decimal @db.Decimal(10, 2) // Cena brutto
+  vatRate    Decimal @default(23) @db.Decimal(5, 2) // Stawka VAT
+
+  // Cena promocyjna (opcjonalnie)
+  promoPrice    Decimal?  @db.Decimal(10, 2)
+  promoValidFrom DateTime?
+  promoValidTo   DateTime?
+
+  // Progi ilościowe (dla cen hurtowych)
+  minQuantity Int @default(1) // Od jakiej ilości obowiązuje cena
+  maxQuantity Int? // Do jakiej ilości (null = bez limitu)
+
+  // Status
+  isActive Boolean @default(true)
+
+  // Metadane
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([priceTableId, productId, minQuantity])
+  @@index([priceTableId])
+  @@index([productId])
+  @@map("price_table_entries")
+}
+
+// Typy dopłat
+enum SurchargeType {
+  FIXED      // Stała kwota (np. 50 PLN)
+  PERCENT    // Procent od wartości (np. 10%)
+  PER_M2     // Za metr kwadratowy (np. 15 PLN/m²)
+  PER_MB     // Za metr bieżący (np. 8 PLN/mb)
+  PER_UNIT   // Za sztukę (np. 2 PLN/szt)
+  PER_KG     // Za kilogram (np. 5 PLN/kg)
+  TIERED     // Progowa (różne stawki dla różnych ilości)
+}
+
+// Dopłaty
+model Surcharge {
+  id       String @id @default(uuid())
+  tenantId String
+
+  // Identyfikacja
+  code String // TRANSPORT, MONTAZ, EXPRESS
+  name String // Transport, Montaż, Dostawa ekspresowa
+
+  // Opis
+  description String?
+
+  // Typ dopłaty
+  type SurchargeType @default(FIXED)
+
+  // Wartość (interpretacja zależy od typu)
+  value Decimal @db.Decimal(10, 4) // Kwota lub procent
+
+  // Wartość minimalna/maksymalna
+  minValue Decimal? @db.Decimal(10, 2) // Min. dopłata (np. min 20 PLN)
+  maxValue Decimal? @db.Decimal(10, 2) // Max. dopłata (np. max 500 PLN)
+
+  // Progi (dla typu TIERED)
+  tiers Json? // [{"from":0,"to":100,"value":50},{"from":100,"to":null,"value":30}]
+
+  // Warunki stosowania
+  appliesToCategories Json? // ["rolety","moskitiery"] lub null dla wszystkich
+  appliesToProducts   Json? // ["prod-1","prod-2"] lub null dla wszystkich
+  minOrderValue       Decimal? @db.Decimal(10, 2) // Min. wartość zamówienia
+  maxOrderValue       Decimal? @db.Decimal(10, 2) // Max. wartość zamówienia
+
+  // Czy wymagana
+  isRequired Boolean @default(false) // Automatycznie dodawana
+  isOptional Boolean @default(true)  // Klient może wybrać
+
+  // Status
+  isActive  Boolean @default(true)
+  sortOrder Int     @default(0)
+
+  // Daty ważności (opcjonalnie)
+  validFrom DateTime?
+  validTo   DateTime?
+
+  // Metadane
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([tenantId, code])
+  @@index([tenantId])
+  @@index([type])
+  @@index([isActive])
+  @@map("surcharges")
+}
+
+// Koszt produktu i marża
+model ProductCost {
+  id       String @id @default(uuid())
+  tenantId String
+
+  // Produkt
+  productId String
+
+  // Kategoria cenowa (opcjonalnie - różne koszty dla różnych kategorii)
+  categoryId String?
+  category   PriceCategory? @relation(fields: [categoryId], references: [id])
+
+  // Cena zakupu
+  purchasePrice    Decimal @db.Decimal(10, 4) // Cena zakupu netto
+  purchaseCurrency String  @default("PLN")
+
+  // Dostawca (opcjonalnie)
+  supplierId   String?
+  supplierName String?
+  supplierSku  String? // SKU u dostawcy
+
+  // Koszty dodatkowe
+  shippingCost   Decimal? @db.Decimal(10, 2) // Koszt wysyłki per jednostka
+  handlingCost   Decimal? @db.Decimal(10, 2) // Koszt obsługi per jednostka
+  customsCost    Decimal? @db.Decimal(10, 2) // Koszt cła per jednostka
+  otherCosts     Decimal? @db.Decimal(10, 2) // Inne koszty
+  totalCost      Decimal? @db.Decimal(10, 4) // Łączny koszt jednostkowy
+
+  // Marża docelowa
+  targetMarginPercent Decimal? @db.Decimal(5, 2) // Docelowa marża %
+  targetMarginValue   Decimal? @db.Decimal(10, 2) // Docelowa marża kwotowa
+
+  // Cena minimalna (nie sprzedawać poniżej)
+  minSalePrice Decimal? @db.Decimal(10, 2)
+
+  // Daty ważności
+  validFrom DateTime @default(now())
+  validTo   DateTime?
+
+  // Status
+  isActive  Boolean @default(true)
+  isDefault Boolean @default(false) // Domyślny koszt dla produktu
+
+  // Metadane
+  lastPurchaseDate DateTime?
+  lastPurchaseQty  Int?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  @@unique([tenantId, productId, categoryId, supplierId])
+  @@index([tenantId])
+  @@index([productId])
+  @@index([categoryId])
+  @@index([supplierId])
+  @@map("product_costs")
+}
+
+// Przypisanie cennika do klienta
+model CustomerPricing {
+  id       String @id @default(uuid())
+  tenantId String
+
+  // Klient
+  customerId String
+
+  // Cennik przypisany
+  priceTableId String?
+
+  // Kategoria cenowa
+  priceCategoryCode String? // RETAIL, WHOLESALE, VIP
+
+  // Indywidualny rabat
+  discountPercent Decimal? @db.Decimal(5, 2) // Stały rabat %
+
+  // Limit kredytowy
+  creditLimit   Decimal? @db.Decimal(12, 2)
+  creditUsed    Decimal? @db.Decimal(12, 2)
+  paymentTerms  Int?     // Termin płatności (dni)
+
+  // Status
+  isActive Boolean @default(true)
+
+  // Daty
+  validFrom DateTime @default(now())
+  validTo   DateTime?
+
+  // Metadane
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([tenantId, customerId])
+  @@index([tenantId])
+  @@index([customerId])
+  @@index([priceTableId])
+  @@map("customer_pricing")
+}
+
+// Dopłaty zastosowane do zamówienia
+model OrderSurcharge {
+  id      String @id @default(uuid())
+  orderId String
+
+  // Dopłata źródłowa
+  surchargeId   String?
+  surchargeCode String // Kod dopłaty (snapshot)
+  surchargeName String // Nazwa dopłaty (snapshot)
+
+  // Typ i wartość
+  type  SurchargeType
+  rate  Decimal @db.Decimal(10, 4) // Stawka użyta
+
+  // Podstawa obliczenia
+  baseValue Decimal? @db.Decimal(10, 2) // Wartość bazowa (np. m², wartość zamówienia)
+  baseUnit  String?  // Jednostka bazowa (m2, mb, kg, szt)
+
+  // Obliczona wartość
+  amount Decimal @db.Decimal(10, 2) // Kwota dopłaty
+
+  // Notatki
+  notes String?
+
+  // Metadane
+  createdAt DateTime @default(now())
+
+  @@index([orderId])
+  @@index([surchargeId])
+  @@map("order_surcharges")
+}
+
+// ============================================
+// @LOYALTY MODULE - Program Lojalnościowy
+// ============================================
+
+// Typ transakcji punktowej
+enum PointsTransactionType {
+  EARNED      // Punkty zdobyte za zakupy
+  REDEEMED    // Punkty wykorzystane
+  BONUS       // Punkty bonusowe (np. urodziny)
+  ADJUSTMENT  // Korekta manualna
+  EXPIRED     // Punkty wygasłe
+  REFUND      // Zwrot punktów (przy zwrocie towaru)
+}
+
+// Typ kodu rabatowego
+enum DiscountCodeType {
+  PERCENT       // Rabat procentowy
+  FIXED_AMOUNT  // Rabat kwotowy
+  FREE_SHIPPING // Darmowa dostawa
+  FREE_PRODUCT  // Darmowy produkt
+  POINTS_BONUS  // Bonus punktowy
+}
+
+// Status kodu rabatowego
+enum DiscountCodeStatus {
+  ACTIVE
+  INACTIVE
+  EXPIRED
+  USED_UP
+}
+
+// Program lojalnościowy (konfiguracja dla tenanta)
+model LoyaltyProgram {
+  id       String @id @default(uuid())
+  tenantId String @unique
+
+  // Nazwa programu
+  name        String @default("Program Lojalnościowy")
+  description String?
+
+  // Status
+  isActive Boolean @default(true)
+
+  // Konfiguracja punktów
+  pointsPerPln    Decimal @default(1) @db.Decimal(10, 4) // Ile punktów za 1 PLN
+  pointValue      Decimal @default(0.01) @db.Decimal(10, 4) // Wartość 1 punktu w PLN
+  minRedeemPoints Int     @default(100) // Minimalna liczba punktów do wykorzystania
+
+  // Wygasanie punktów
+  pointsExpiryMonths Int?    // Po ilu miesiącach punkty wygasają (null = nie wygasają)
+  expiryWarningDays  Int     @default(30) // Na ile dni przed wygaśnięciem powiadomić
+
+  // Reguły
+  earnOnDiscountedOrders Boolean @default(true) // Czy naliczać punkty za zamówienia z rabatem
+  allowPartialRedeem     Boolean @default(true) // Czy można wykorzystać część punktów
+  maxRedeemPercent       Decimal @default(50) @db.Decimal(5, 2) // Max % wartości zamówienia do zapłaty punktami
+
+  // Branding
+  pointsName       String @default("punkty") // Nazwa jednostki (punkty, gwiazdki, etc.)
+  pointsNamePlural String @default("punktów")
+  currency         String @default("PLN")
+
+  // Metadane
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relacje
+  tiers        LoyaltyTier[]
+  transactions PointsTransaction[]
+  customers    CustomerLoyalty[]
+
+  @@index([tenantId])
+  @@map("loyalty_programs")
+}
+
+// Poziomy lojalnościowe (Bronze, Silver, Gold, Platinum, etc.)
+model LoyaltyTier {
+  id       String @id @default(uuid())
+  tenantId String
+
+  // Program
+  programId String
+  program   LoyaltyProgram @relation(fields: [programId], references: [id], onDelete: Cascade)
+
+  // Identyfikacja
+  code String // BRONZE, SILVER, GOLD, PLATINUM
+  name String // Brązowy, Srebrny, Złoty, Platynowy
+
+  // Progi
+  minPoints      Int // Minimalna liczba punktów do osiągnięcia poziomu
+  minOrdersCount Int? // Minimalna liczba zamówień
+  minTotalSpent  Decimal? @db.Decimal(12, 2) // Minimalna suma wydatków
+
+  // Korzyści
+  discountPercent     Decimal @default(0) @db.Decimal(5, 2) // Stały rabat %
+  pointsMultiplier    Decimal @default(1) @db.Decimal(5, 2) // Mnożnik punktów (1.5x, 2x)
+  freeShippingMinimum Decimal? @db.Decimal(10, 2) // Darmowa dostawa od kwoty
+  prioritySupport     Boolean @default(false)
+  earlyAccess         Boolean @default(false) // Wcześniejszy dostęp do promocji
+  exclusiveOffers     Boolean @default(false)
+
+  // Wizualizacja
+  color       String? // Kolor poziomu (hex)
+  icon        String? // Ikona
+  badgeImage  String? // URL do obrazka odznaki
+  description String? // Opis korzyści
+
+  // Kolejność
+  sortOrder Int @default(0)
+
+  // Status
+  isActive Boolean @default(true)
+
+  // Metadane
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relacje
+  customers CustomerLoyalty[]
+
+  @@unique([tenantId, code])
+  @@index([tenantId])
+  @@index([programId])
+  @@map("loyalty_tiers")
+}
+
+// Stan lojalnościowy klienta
+model CustomerLoyalty {
+  id       String @id @default(uuid())
+  tenantId String
+
+  // Klient
+  customerId String
+
+  // Program
+  programId String
+  program   LoyaltyProgram @relation(fields: [programId], references: [id], onDelete: Cascade)
+
+  // Aktualny poziom
+  tierId String?
+  tier   LoyaltyTier? @relation(fields: [tierId], references: [id])
+
+  // Punkty
+  currentPoints  Int @default(0) // Aktualne dostępne punkty
+  lifetimePoints Int @default(0) // Wszystkie zdobyte punkty (historycznie)
+  redeemedPoints Int @default(0) // Wykorzystane punkty
+  expiredPoints  Int @default(0) // Wygasłe punkty
+
+  // Statystyki
+  totalOrders    Int     @default(0)
+  totalSpent     Decimal @default(0) @db.Decimal(12, 2)
+  averageOrder   Decimal @default(0) @db.Decimal(10, 2)
+  lastOrderDate  DateTime?
+  lastPointsDate DateTime? // Data ostatniego naliczenia punktów
+
+  // Data osiągnięcia poziomu
+  tierAchievedAt DateTime?
+  tierExpiresAt  DateTime? // Jeśli poziomy wygasają
+
+  // Status
+  isActive    Boolean @default(true)
+  isSuspended Boolean @default(false) // Zawieszony w programie
+  suspendedAt DateTime?
+  suspendReason String?
+
+  // Preferencje
+  emailNotifications Boolean @default(true)
+  smsNotifications   Boolean @default(false)
+
+  // Metadane
+  enrolledAt DateTime @default(now())
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  // Relacje
+  transactions PointsTransaction[]
+
+  @@unique([tenantId, customerId])
+  @@index([tenantId])
+  @@index([customerId])
+  @@index([programId])
+  @@index([tierId])
+  @@map("customer_loyalty")
+}
+
+// Historia transakcji punktowych
+model PointsTransaction {
+  id       String @id @default(uuid())
+  tenantId String
+
+  // Program i klient
+  programId  String
+  program    LoyaltyProgram  @relation(fields: [programId], references: [id], onDelete: Cascade)
+  loyaltyId  String
+  loyalty    CustomerLoyalty @relation(fields: [loyaltyId], references: [id], onDelete: Cascade)
+  customerId String
+
+  // Typ transakcji
+  type PointsTransactionType
+
+  // Punkty (+ dla earned, - dla redeemed)
+  points       Int
+  pointsBefore Int // Saldo przed transakcją
+  pointsAfter  Int // Saldo po transakcji
+
+  // Powiązane zamówienie
+  orderId     String?
+  orderNumber String?
+  orderValue  Decimal? @db.Decimal(10, 2)
+
+  // Kod rabatowy (jeśli użyty)
+  discountCodeId String?
+
+  // Opis i notatki
+  description String?
+  notes       String?
+
+  // Wygasanie
+  expiresAt DateTime? // Kiedy te punkty wygasną
+
+  // Kto wykonał (dla manual adjustments)
+  performedBy   String? // userId
+  performedByName String?
+
+  // Metadane
+  createdAt DateTime @default(now())
+
+  @@index([tenantId])
+  @@index([programId])
+  @@index([loyaltyId])
+  @@index([customerId])
+  @@index([orderId])
+  @@index([type])
+  @@index([createdAt])
+  @@map("points_transactions")
+}
+
+// Kody rabatowe
+model DiscountCode {
+  id       String @id @default(uuid())
+  tenantId String
+
+  // Identyfikacja
+  code        String // SUMMER2024, WELCOME10, etc.
+  name        String // Nazwa wewnętrzna
+  description String?
+
+  // Typ i wartość
+  type  DiscountCodeType
+  value Decimal @db.Decimal(10, 2) // Wartość (% lub kwota)
+
+  // Ograniczenia kwotowe
+  minOrderAmount Decimal? @db.Decimal(10, 2) // Minimalna wartość zamówienia
+  maxDiscount    Decimal? @db.Decimal(10, 2) // Maksymalna kwota rabatu
+
+  // Limity użycia
+  maxUses        Int? // Maksymalna liczba użyć ogółem
+  maxUsesPerUser Int? // Maksymalna liczba użyć per klient
+  currentUses    Int  @default(0) // Aktualna liczba użyć
+
+  // Ważność
+  validFrom DateTime @default(now())
+  validTo   DateTime?
+
+  // Ograniczenia do produktów/kategorii
+  applicableProductIds   String[] // Lista ID produktów
+  applicableCategoryIds  String[] // Lista ID kategorii
+  excludedProductIds     String[] // Wykluczone produkty
+  excludedCategoryIds    String[] // Wykluczone kategorie
+
+  // Ograniczenia do klientów
+  applicableCustomerIds String[]  // Tylko dla wybranych klientów
+  applicableTierIds     String[]  // Tylko dla wybranych poziomów lojalnościowych
+  newCustomersOnly      Boolean   @default(false) // Tylko dla nowych klientów
+  firstOrderOnly        Boolean   @default(false) // Tylko dla pierwszego zamówienia
+
+  // Kombinowanie z innymi rabatami
+  canCombine        Boolean @default(false) // Czy można łączyć z innymi kodami
+  combineWithPoints Boolean @default(true) // Czy można łączyć z punktami
+
+  // Status
+  status   DiscountCodeStatus @default(ACTIVE)
+  isPublic Boolean            @default(false) // Czy kod jest publiczny
+
+  // Kampania
+  campaignId   String?
+  campaignName String?
+
+  // Metadane
+  createdBy   String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relacje
+  usages DiscountCodeUsage[]
+
+  @@unique([tenantId, code])
+  @@index([tenantId])
+  @@index([code])
+  @@index([status])
+  @@index([validFrom, validTo])
+  @@map("discount_codes")
+}
+
+// Historia użycia kodów rabatowych
+model DiscountCodeUsage {
+  id       String @id @default(uuid())
+  tenantId String
+
+  // Kod
+  discountCodeId String
+  discountCode   DiscountCode @relation(fields: [discountCodeId], references: [id], onDelete: Cascade)
+
+  // Klient i zamówienie
+  customerId  String
+  orderId     String
+  orderNumber String?
+
+  // Wartość rabatu
+  discountAmount Decimal @db.Decimal(10, 2)
+  orderValue     Decimal @db.Decimal(10, 2)
+
+  // Metadane
+  usedAt DateTime @default(now())
+
+  @@index([tenantId])
+  @@index([discountCodeId])
+  @@index([customerId])
+  @@index([orderId])
+  @@map("discount_code_usages")
+}
+
+// ============================================
+// @AI-BRANDING - OMENROUTER
+// ============================================
+
+// Dostępni providerzy AI
+enum AiProvider {
+  OLLAMA    // Local, free
+  GROQ      // Cloud, free tier
+  OPENAI    // Cloud, paid
+  ANTHROPIC // Cloud, paid
+  MISTRAL   // Cloud, free tier
+}
+
+// Status ekstrakcji brandingu
+enum BrandExtractionStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+// Konfiguracja AI dla tenanta lub globalna
+model AiModelConfig {
+  id       String  @id @default(uuid())
+  tenantId String? // null = global default
+
+  // Provider settings
+  provider  AiProvider @default(OLLAMA)
+  modelName String     @default("llama2")
+  apiKey    String?    // encrypted
+  baseUrl   String?    // for self-hosted (e.g., Ollama)
+
+  // Usage limits
+  maxTokens   Int   @default(2000)
+  temperature Float @default(0.7)
+
+  // Features enabled
+  brandExtraction   Boolean @default(true)
+  contentGeneration Boolean @default(false)
+  chatAssistant     Boolean @default(false)
+
+  // Rate limiting
+  maxRequestsPerMinute Int @default(30)
+  maxRequestsPerDay    Int @default(1000)
+
+  // Usage tracking
+  requestsToday    Int       @default(0)
+  lastRequestAt    DateTime?
+  totalRequests    Int       @default(0)
+  totalTokensUsed  Int       @default(0)
+
+  // Status
+  isActive  Boolean @default(true)
+  isDefault Boolean @default(false) // Default for new tenants
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([tenantId, provider])
+  @@index([tenantId])
+  @@index([provider])
+  @@index([isActive])
+  @@map("ai_model_configs")
+}
+
+// Historia ekstrakcji brandingu
+model BrandExtraction {
+  id       String  @id @default(uuid())
+  tenantId String? // null if pre-tenant (during onboarding)
+
+  // Input
+  inputUrl String
+  inputDomain String? // Extracted domain from URL
+
+  // Status
+  status       BrandExtractionStatus @default(PENDING)
+  errorMessage String?
+  retryCount   Int                   @default(0)
+
+  // AI Provider used
+  provider  AiProvider?
+  modelName String?
+
+  // Results
+  result Json? // BrandExtractionResult
+
+  // Extracted data (denormalized for easy access)
+  companyName   String?
+  logoUrl       String?
+  faviconUrl    String?
+  primaryColor  String?
+  secondaryColor String?
+  description   String?
+  industry      String?
+
+  // Processing metadata
+  processingTimeMs Int?
+  confidence       Float? // 0-1 confidence score
+  source           String? // 'meta_tags', 'ai_analysis', 'mixed'
+
+  // Who initiated
+  initiatedBy   String? // userId
+  initiatedByIp String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([tenantId])
+  @@index([inputDomain])
+  @@index([status])
+  @@index([createdAt])
+  @@map("brand_extractions")
+}
+
+// Portal Access Token (dla klientów - dostęp bez logowania)
+model PortalAccessToken {
+  id       String @id @default(uuid())
+  tenantId String
+
+  // Co daje dostęp
+  customerId String?
+  orderId    String?
+  quoteId    String?
+
+  // Token
+  token     String   @unique
+  tokenHash String?  // SHA256 hash for lookup
+
+  // Ważność
+  expiresAt DateTime
+  usedAt    DateTime? // Kiedy użyto po raz pierwszy
+  usesCount Int       @default(0)
+  maxUses   Int       @default(10) // Max liczba użyć
+
+  // Typ dostępu
+  accessType String @default("VIEW") // VIEW, ACCEPT_QUOTE, TRACK_ORDER
+
+  // Metadane
+  createdBy   String?
+  createdAt   DateTime @default(now())
+  lastUsedAt  DateTime?
+  lastUsedIp  String?
+
+  @@index([tenantId])
+  @@index([token])
+  @@index([customerId])
+  @@index([orderId])
+  @@index([quoteId])
+  @@index([expiresAt])
+  @@map("portal_access_tokens")
+}
+
+// Customer Portal Session (zalogowany klient)
+model CustomerPortalSession {
+  id       String @id @default(uuid())
+  tenantId String
+
+  // Klient
+  customerId String
+  email      String?
+  phone      String?
+
+  // Session
+  sessionToken String   @unique
+  expiresAt    DateTime
+
+  // Device info
+  userAgent String?
+  ipAddress String?
+
+  // Status
+  isActive Boolean @default(true)
+
+  createdAt  DateTime @default(now())
+  lastSeenAt DateTime @default(now())
+
+  @@index([tenantId])
+  @@index([customerId])
+  @@index([sessionToken])
+  @@index([expiresAt])
+  @@map("customer_portal_sessions")
+}
+
+// Quote Response (odpowiedź na ofertę przez portal)
+model QuoteResponse {
+  id       String @id @default(uuid())
+  tenantId String
+
+  // Oferta
+  quoteId     String
+  quoteNumber String?
+
+  // Odpowiedź
+  response    String // ACCEPTED, REJECTED, COUNTER_OFFER
+  reason      String?
+  counterOffer Json? // Kontr-propozycja
+
+  // Podpis (opcjonalnie)
+  signatureName  String?
+  signatureImage String? // base64 podpisu
+  signatureIp    String?
+
+  // Kto odpowiedział
+  respondedBy   String? // customerId lub nazwa
+  respondedAt   DateTime @default(now())
+
+  // Token użyty do dostępu
+  accessTokenId String?
+
+  @@index([tenantId])
+  @@index([quoteId])
+  @@index([response])
+  @@map("quote_responses")
+}
+
+// ===========================================
+// PLATFORM ADMINISTRATION
+// ===========================================
+
+model PlatformAdmin {
+  id           String   @id @default(uuid())
+  email        String   @unique
+  name         String
+  password     String   // bcrypt hash
+  isSuperAdmin Boolean  @default(false)
+  isActive     Boolean  @default(true)
+  lastLoginAt  DateTime?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@map("platform_admins")
 }

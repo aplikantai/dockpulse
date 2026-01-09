@@ -11,6 +11,7 @@ import {
   CreatePlatformAdminDto,
 } from './dto/platform.dto';
 import { PlatformAdminPayload } from './guards/platform-admin.guard';
+import { UserRole } from '@prisma/client';
 
 @Injectable()
 export class PlatformAuthService {
@@ -30,13 +31,11 @@ export class PlatformAuthService {
     };
   }> {
     // Platform admins are stored in a separate table or with special flag
-    // For now, we'll use the users table with tenantId = null
     const admin = await this.prisma.$queryRaw<any[]>`
       SELECT * FROM platform_admins
       WHERE email = ${dto.email}
       LIMIT 1
     `.catch(() => []);
-    // Removed: active = true check - field doesn't exist
 
     // If no platform_admins table, fallback to check for special users
     let adminUser = admin[0];
@@ -57,7 +56,7 @@ export class PlatformAuthService {
           email: users.email,
           name: users.name,
           password: users.password,
-          isSuperAdmin: users.role === 'super_admin',
+          isSuperAdmin: users.role === UserRole.PLATFORM_ADMIN,
         };
       }
     }
@@ -132,7 +131,7 @@ export class PlatformAuthService {
     return this.prisma.user.findMany({
       where: {
         tenantId: null as any,
-        role: { in: ['platform_admin', 'super_admin'] },
+        role: UserRole.PLATFORM_ADMIN,
       },
       select: {
         id: true,

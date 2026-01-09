@@ -22,7 +22,7 @@ import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { Public } from '../auth/decorators/public.decorator';
 import { CurrentUser, CurrentUserData } from '../auth/decorators/current-user.decorator';
-import { UserRole } from '../auth/dto/auth.dto';
+import { UserRole } from '@prisma/client';
 import {
   ToggleModuleDto,
   UpdateFieldConfigDto,

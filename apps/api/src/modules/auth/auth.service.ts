@@ -15,9 +15,14 @@ import {
   JwtPayload,
   ChangePasswordResponse,
   LogoutResponse,
+  ForgotPasswordDto,
+  ForgotPasswordResponse,
+  ResetPasswordDto,
+  ResetPasswordResponse,
 } from './dto/auth.dto';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { Cache } from 'cache-manager';
+import { randomUUID } from 'crypto';
 
 @Injectable()
 export class AuthService {
@@ -254,5 +259,99 @@ export class AuthService {
     // 2. Invalidate all refresh tokens for this user
 
     return { message: 'Logged out successfully' };
+  }
+
+  // ============================================
+  // FORGOT PASSWORD / RESET PASSWORD
+  // ============================================
+
+  /**
+   * Request password reset - generates token and sends email
+   * For now, returns token in response (in production, send via email)
+   */
+  async forgotPassword(dto: ForgotPasswordDto): Promise<ForgotPasswordResponse> {
+    // Find user by email
+    const user = await (this.prisma as any).user.findFirst({
+      where: { email: dto.email },
+    });
+
+    // Always return success to prevent email enumeration
+    if (!user) {
+      return { message: 'If the email exists, a password reset link has been sent' };
+    }
+
+    // Generate reset token
+    const token = randomUUID();
+    const expiresAt = new Date();
+    expiresAt.setHours(expiresAt.getHours() + 1); // 1 hour expiry
+
+    // Delete any existing unused tokens for this user
+    await (this.prisma as any).passwordResetToken.deleteMany({
+      where: {
+        userId: user.id,
+        usedAt: null,
+      },
+    });
+
+    // Create new reset token
+    await (this.prisma as any).passwordResetToken.create({
+      data: {
+        userId: user.id,
+        token,
+        expiresAt,
+      },
+    });
+
+    // TODO: Send email with reset link
+    // For now, we'll log the token (in production, send via email)
+    console.log(`[FORGOT PASSWORD] Reset token for ${user.email}: ${token}`);
+    console.log(`[FORGOT PASSWORD] Reset link: http://localhost:3000/reset-password?token=${token}`);
+
+    return { message: 'If the email exists, a password reset link has been sent' };
+  }
+
+  /**
+   * Reset password using token
+   */
+  async resetPassword(dto: ResetPasswordDto): Promise<ResetPasswordResponse> {
+    // Find valid token
+    const resetToken = await (this.prisma as any).passwordResetToken.findUnique({
+      where: { token: dto.token },
+      include: { user: true },
+    });
+
+    if (!resetToken) {
+      throw new UnauthorizedException('Invalid or expired reset token');
+    }
+
+    // Check if token is expired
+    if (new Date() > resetToken.expiresAt) {
+      throw new UnauthorizedException('Invalid or expired reset token');
+    }
+
+    // Check if token was already used
+    if (resetToken.usedAt) {
+      throw new UnauthorizedException('Invalid or expired reset token');
+    }
+
+    // Hash new password
+    const hashedPassword = await bcrypt.hash(dto.newPassword, this.SALT_ROUNDS);
+
+    // Update user password
+    await (this.prisma as any).user.update({
+      where: { id: resetToken.userId },
+      data: { password: hashedPassword },
+    });
+
+    // Mark token as used
+    await (this.prisma as any).passwordResetToken.update({
+      where: { id: resetToken.id },
+      data: { usedAt: new Date() },
+    });
+
+    // Invalidate user cache
+    await this.cacheManager.del(`user:${resetToken.userId}`);
+
+    return { message: 'Password reset successfully' };
   }
 }

@@ -64,7 +64,7 @@ export function MarketingPage() {
 
           <div className="flex flex-col sm:flex-row gap-4 justify-center items-center pt-6 md:pt-10">
             <Link
-              href="/onboarding"
+              href="/start"
               className="w-full sm:w-auto px-10 py-4 md:px-12 md:py-5 bg-[#1d1d1f] text-white rounded-full font-bold text-lg hover:bg-black transition-all shadow-2xl active:scale-95 hover:shadow-blue-500/20"
             >
               Rozpocznij teraz
@@ -86,6 +86,108 @@ export function MarketingPage() {
                 alt="DockPulse Dashboard Preview"
                 className="rounded-[20px] md:rounded-[40px] w-full object-cover h-[300px] sm:h-[450px] md:h-[650px] shadow-inner"
               />
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* How It Works - Tenant Subdomain Info */}
+      <section className="py-16 md:py-24 px-4 md:px-6 bg-gradient-to-br from-blue-50 to-indigo-50">
+        <div className="max-w-5xl mx-auto">
+          <div className="text-center mb-12">
+            <span className="text-xs font-bold tracking-[0.3em] text-indigo-600 uppercase bg-indigo-50 px-4 py-1.5 rounded-full">
+              Jak to działa
+            </span>
+            <h2 className="text-3xl md:text-5xl font-black text-[#1d1d1f] mt-6 mb-4 tracking-tight">
+              Twoja własna przestrzeń w chmurze
+            </h2>
+            <p className="text-lg md:text-xl text-slate-600 max-w-2xl mx-auto">
+              Każda firma dostaje unikalną subdomenę i kompletnie izolowane środowisko
+            </p>
+          </div>
+
+          <div className="backdrop-blur-xl bg-white/80 rounded-3xl p-8 md:p-12 border border-white/60 shadow-2xl">
+            <div className="grid md:grid-cols-2 gap-8 md:gap-12 items-center">
+              <div className="space-y-6">
+                <div className="space-y-3">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white font-bold">
+                      1
+                    </div>
+                    <h3 className="text-xl font-bold text-[#1d1d1f]">Zarejestruj firmę</h3>
+                  </div>
+                  <p className="text-slate-600 pl-13">
+                    Wybierz nazwę swojej firmy podczas rejestracji
+                  </p>
+                </div>
+
+                <div className="space-y-3">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-purple-500 to-pink-600 flex items-center justify-center text-white font-bold">
+                      2
+                    </div>
+                    <h3 className="text-xl font-bold text-[#1d1d1f]">Otrzymaj subdomenę</h3>
+                  </div>
+                  <p className="text-slate-600 pl-13">
+                    Automatycznie tworzymy dla Ciebie unikalną subdomenę
+                  </p>
+                </div>
+
+                <div className="space-y-3">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center text-white font-bold">
+                      3
+                    </div>
+                    <h3 className="text-xl font-bold text-[#1d1d1f]">Zaloguj się</h3>
+                  </div>
+                  <p className="text-slate-600 pl-13">
+                    Wejdź na swój dedykowany adres i zacznij pracę
+                  </p>
+                </div>
+              </div>
+
+              <div className="bg-gradient-to-br from-slate-900 to-indigo-900 rounded-2xl p-6 md:p-8 shadow-2xl border border-slate-700">
+                <div className="space-y-4">
+                  <div className="text-sm text-slate-400 font-mono">Przykładowe adresy:</div>
+                  <div className="space-y-3">
+                    <div className="backdrop-blur-sm bg-white/5 rounded-xl p-4 border border-white/10">
+                      <div className="text-white font-mono text-sm md:text-base break-all">
+                        <span className="text-blue-400">twojafirma</span>.dockpulse.com
+                      </div>
+                    </div>
+                    <div className="backdrop-blur-sm bg-white/5 rounded-xl p-4 border border-white/10">
+                      <div className="text-white font-mono text-sm md:text-base break-all">
+                        <span className="text-purple-400">abc-transport</span>.dockpulse.com
+                      </div>
+                    </div>
+                    <div className="backdrop-blur-sm bg-white/5 rounded-xl p-4 border border-white/10">
+                      <div className="text-white font-mono text-sm md:text-base break-all">
+                        <span className="text-cyan-400">studio-design</span>.dockpulse.com
+                      </div>
+                    </div>
+                  </div>
+                  <div className="text-xs text-slate-500 mt-4">
+                    Twoje dane są całkowicie izolowane od innych firm
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-8 pt-8 border-t border-slate-200">
+              <div className="flex flex-col md:flex-row items-center justify-between gap-4">
+                <div className="flex items-center gap-3">
+                  <CheckCircle className="w-5 h-5 text-green-600" />
+                  <span className="text-sm text-slate-600 font-medium">Bezpieczne połączenie SSL</span>
+                </div>
+                <div className="flex items-center gap-3">
+                  <CheckCircle className="w-5 h-5 text-green-600" />
+                  <span className="text-sm text-slate-600 font-medium">Pełna izolacja danych</span>
+                </div>
+                <div className="flex items-center gap-3">
+                  <CheckCircle className="w-5 h-5 text-green-600" />
+                  <span className="text-sm text-slate-600 font-medium">Własne branding</span>
+                </div>
+              </div>
             </div>
           </div>
         </div>

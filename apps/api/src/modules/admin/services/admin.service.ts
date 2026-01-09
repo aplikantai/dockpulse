@@ -1,11 +1,17 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
+import { UserRole } from '@prisma/client';
 import {
   PlatformStatsDto,
   TenantListDto,
   TenantDetailDto,
   ModuleCatalogItemDto,
   CreateTenantDto,
+  UpdateTenantDto,
+  TenantUserDto,
+  CreateTenantUserDto,
+  UpdateTenantUserDto,
+  TenantStatsDto,
 } from '../dto/platform-stats.dto';
 import {
   MODULE_REGISTRY,
@@ -541,5 +547,679 @@ export class AdminService {
     });
 
     this.logger.log(`Module ${moduleCode} uninstalled from tenant ${tenantId}`);
+  }
+
+  // ============================================
+  // PLATFORM ADMIN USER MANAGEMENT
+  // ============================================
+
+  /**
+   * Get all platform admins
+   */
+  async getPlatformAdmins() {
+    this.logger.log('Fetching all platform admins');
+
+    const admins = await this.prisma.user.findMany({
+      where: {
+        role: 'PLATFORM_ADMIN',
+      },
+      orderBy: { createdAt: 'desc' },
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        role: true,
+        active: true,
+        lastLogin: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+    });
+
+    return admins;
+  }
+
+  /**
+   * Create new platform admin
+   */
+  async createPlatformAdmin(dto: { email: string; password: string; name: string }) {
+    this.logger.log(`Creating new platform admin: ${dto.email}`);
+
+    const bcrypt = require('bcrypt');
+    const hashedPassword = await bcrypt.hash(dto.password, 10);
+
+    const admin = await this.prisma.user.create({
+      data: {
+        email: dto.email,
+        password: hashedPassword,
+        name: dto.name,
+        role: 'PLATFORM_ADMIN',
+        tenantId: null, // Platform admins don't belong to any tenant
+        active: true,
+      },
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        role: true,
+        active: true,
+        lastLogin: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+    });
+
+    this.logger.log(`Platform admin created: ${admin.id}`);
+    return admin;
+  }
+
+  /**
+   * Update platform admin
+   */
+  async updatePlatformAdmin(adminId: string, dto: { email?: string; name?: string }) {
+    this.logger.log(`Updating platform admin: ${adminId}`);
+
+    const admin = await this.prisma.user.update({
+      where: {
+        id: adminId,
+      },
+      data: {
+        email: dto.email,
+        name: dto.name,
+      },
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        role: true,
+        active: true,
+        lastLogin: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+    });
+
+    return admin;
+  }
+
+  /**
+   * Change platform admin password
+   */
+  async changeAdminPassword(adminId: string, newPassword: string) {
+    this.logger.log(`Changing password for platform admin: ${adminId}`);
+
+    const bcrypt = require('bcrypt');
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+
+    await this.prisma.user.update({
+      where: { id: adminId },
+      data: { password: hashedPassword },
+    });
+
+    this.logger.log(`Password changed successfully for admin: ${adminId}`);
+  }
+
+  /**
+   * Delete platform admin
+   */
+  async deletePlatformAdmin(adminId: string) {
+    this.logger.log(`Deleting platform admin: ${adminId}`);
+
+    // Check if it's the last admin
+    const adminCount = await this.prisma.user.count({
+      where: { role: 'PLATFORM_ADMIN' },
+    });
+
+    if (adminCount <= 1) {
+      throw new Error('Cannot delete the last platform admin');
+    }
+
+    await this.prisma.user.delete({
+      where: { id: adminId },
+    });
+
+    this.logger.log(`Platform admin deleted: ${adminId}`);
+  }
+
+  // ============================================
+  // TENANT MANAGEMENT (FULL CRUD)
+  // ============================================
+
+  /**
+   * Update tenant
+   */
+  async updateTenant(tenantId: string, dto: UpdateTenantDto): Promise<TenantDetailDto> {
+    this.logger.log(`Updating tenant: ${tenantId}`);
+
+    const existingTenant = await this.prisma.tenant.findUnique({
+      where: { id: tenantId },
+    });
+
+    if (!existingTenant) {
+      throw new NotFoundException(`Tenant ${tenantId} not found`);
+    }
+
+    // Build update data
+    const updateData: any = {};
+    if (dto.name !== undefined) updateData.name = dto.name;
+    if (dto.slug !== undefined) updateData.slug = dto.slug;
+
+    // Store settings in JSON fields (using existing settings field or creating new one)
+    if (dto.settings !== undefined || dto.branding !== undefined || dto.domain !== undefined || dto.plan !== undefined || dto.status !== undefined) {
+      const currentSettings = (existingTenant as any).settings || {};
+      updateData.settings = {
+        ...currentSettings,
+        ...(dto.domain !== undefined && { domain: dto.domain }),
+        ...(dto.plan !== undefined && { plan: dto.plan }),
+        ...(dto.status !== undefined && { status: dto.status }),
+        ...(dto.branding !== undefined && { branding: dto.branding }),
+        ...(dto.settings !== undefined && dto.settings),
+      };
+    }
+
+    const tenant = await this.prisma.tenant.update({
+      where: { id: tenantId },
+      data: updateData,
+      include: {
+        users: true,
+        modules: true,
+      },
+    });
+
+    this.logger.log(`Tenant updated: ${tenantId}`);
+
+    return this.getTenantDetail(tenantId);
+  }
+
+  /**
+   * Suspend tenant
+   */
+  async suspendTenant(tenantId: string, reason?: string): Promise<TenantDetailDto> {
+    this.logger.log(`Suspending tenant: ${tenantId}, reason: ${reason || 'Not specified'}`);
+
+    const tenant = await this.prisma.tenant.findUnique({
+      where: { id: tenantId },
+    });
+
+    if (!tenant) {
+      throw new NotFoundException(`Tenant ${tenantId} not found`);
+    }
+
+    const currentSettings = (tenant as any).settings || {};
+
+    await this.prisma.tenant.update({
+      where: { id: tenantId },
+      data: {
+        settings: {
+          ...currentSettings,
+          status: 'suspended',
+          suspendedAt: new Date().toISOString(),
+          suspendReason: reason || 'Suspended by platform admin',
+        },
+      },
+    });
+
+    // Optionally deactivate all users
+    await this.prisma.user.updateMany({
+      where: { tenantId },
+      data: { active: false },
+    });
+
+    this.logger.log(`Tenant suspended: ${tenantId}`);
+
+    return this.getTenantDetail(tenantId);
+  }
+
+  /**
+   * Reactivate suspended tenant
+   */
+  async reactivateTenant(tenantId: string): Promise<TenantDetailDto> {
+    this.logger.log(`Reactivating tenant: ${tenantId}`);
+
+    const tenant = await this.prisma.tenant.findUnique({
+      where: { id: tenantId },
+    });
+
+    if (!tenant) {
+      throw new NotFoundException(`Tenant ${tenantId} not found`);
+    }
+
+    const currentSettings = (tenant as any).settings || {};
+
+    await this.prisma.tenant.update({
+      where: { id: tenantId },
+      data: {
+        settings: {
+          ...currentSettings,
+          status: 'active',
+          suspendedAt: null,
+          suspendReason: null,
+          reactivatedAt: new Date().toISOString(),
+        },
+      },
+    });
+
+    // Reactivate admin users
+    await this.prisma.user.updateMany({
+      where: {
+        tenantId,
+        role: 'ADMIN',
+      },
+      data: { active: true },
+    });
+
+    this.logger.log(`Tenant reactivated: ${tenantId}`);
+
+    return this.getTenantDetail(tenantId);
+  }
+
+  /**
+   * Delete tenant (soft delete - marks as deleted)
+   */
+  async deleteTenant(tenantId: string): Promise<void> {
+    this.logger.log(`Deleting tenant: ${tenantId}`);
+
+    const tenant = await this.prisma.tenant.findUnique({
+      where: { id: tenantId },
+    });
+
+    if (!tenant) {
+      throw new NotFoundException(`Tenant ${tenantId} not found`);
+    }
+
+    const currentSettings = (tenant as any).settings || {};
+
+    // Soft delete - mark as deleted
+    await this.prisma.tenant.update({
+      where: { id: tenantId },
+      data: {
+        settings: {
+          ...currentSettings,
+          status: 'deleted',
+          deletedAt: new Date().toISOString(),
+        },
+      },
+    });
+
+    // Deactivate all users
+    await this.prisma.user.updateMany({
+      where: { tenantId },
+      data: { active: false },
+    });
+
+    // Disable all modules
+    await this.prisma.tenantModule.updateMany({
+      where: { tenantId },
+      data: { isEnabled: false },
+    });
+
+    this.logger.log(`Tenant deleted (soft): ${tenantId}`);
+  }
+
+  /**
+   * Permanently delete tenant (hard delete)
+   * WARNING: This deletes all tenant data permanently!
+   */
+  async permanentlyDeleteTenant(tenantId: string): Promise<void> {
+    this.logger.log(`PERMANENTLY deleting tenant: ${tenantId}`);
+
+    const tenant = await this.prisma.tenant.findUnique({
+      where: { id: tenantId },
+    });
+
+    if (!tenant) {
+      throw new NotFoundException(`Tenant ${tenantId} not found`);
+    }
+
+    // Delete in correct order (respecting foreign keys)
+    await this.prisma.$transaction(async (tx) => {
+      // Delete event logs
+      await tx.eventLog.deleteMany({ where: { tenantId } });
+
+      // Delete tenant modules
+      await tx.tenantModule.deleteMany({ where: { tenantId } });
+
+      // Delete users
+      await tx.user.deleteMany({ where: { tenantId } });
+
+      // Finally delete tenant
+      await tx.tenant.delete({ where: { id: tenantId } });
+    });
+
+    this.logger.log(`Tenant permanently deleted: ${tenantId}`);
+  }
+
+  // ============================================
+  // TENANT USER MANAGEMENT
+  // ============================================
+
+  /**
+   * Get all users for a tenant
+   */
+  async getTenantUsers(tenantId: string): Promise<TenantUserDto[]> {
+    this.logger.log(`Fetching users for tenant: ${tenantId}`);
+
+    const tenant = await this.prisma.tenant.findUnique({
+      where: { id: tenantId },
+    });
+
+    if (!tenant) {
+      throw new NotFoundException(`Tenant ${tenantId} not found`);
+    }
+
+    const users = await this.prisma.user.findMany({
+      where: { tenantId },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    return users.map(u => ({
+      id: u.id,
+      email: u.email,
+      name: u.name || undefined,
+      firstName: (u as any).firstName || undefined,
+      lastName: (u as any).lastName || undefined,
+      role: u.role,
+      active: u.active,
+      lastLogin: u.lastLogin || undefined,
+      createdAt: u.createdAt,
+    }));
+  }
+
+  /**
+   * Create user for tenant
+   */
+  async createTenantUser(tenantId: string, dto: CreateTenantUserDto): Promise<TenantUserDto> {
+    this.logger.log(`Creating user for tenant: ${tenantId}, email: ${dto.email}`);
+
+    const tenant = await this.prisma.tenant.findUnique({
+      where: { id: tenantId },
+    });
+
+    if (!tenant) {
+      throw new NotFoundException(`Tenant ${tenantId} not found`);
+    }
+
+    // Check if email already exists in this tenant
+    const existingUser = await this.prisma.user.findFirst({
+      where: {
+        tenantId,
+        email: dto.email,
+      },
+    });
+
+    if (existingUser) {
+      throw new BadRequestException(`User with email ${dto.email} already exists in this tenant`);
+    }
+
+    const bcrypt = require('bcrypt');
+    const hashedPassword = dto.password
+      ? await bcrypt.hash(dto.password, 10)
+      : await bcrypt.hash('TEMP_PASSWORD_' + Date.now(), 10);
+
+    const user = await this.prisma.user.create({
+      data: {
+        tenantId,
+        email: dto.email,
+        name: dto.name || `${dto.firstName || ''} ${dto.lastName || ''}`.trim() || undefined,
+        password: hashedPassword,
+        role: dto.role as UserRole,
+        active: true,
+      },
+    });
+
+    this.logger.log(`User created: ${user.id} for tenant: ${tenantId}`);
+
+    return {
+      id: user.id,
+      email: user.email,
+      name: user.name || undefined,
+      firstName: (user as any).firstName || undefined,
+      lastName: (user as any).lastName || undefined,
+      role: user.role,
+      active: user.active,
+      lastLogin: user.lastLogin || undefined,
+      createdAt: user.createdAt,
+    };
+  }
+
+  /**
+   * Update tenant user
+   */
+  async updateTenantUser(tenantId: string, userId: string, dto: UpdateTenantUserDto): Promise<TenantUserDto> {
+    this.logger.log(`Updating user ${userId} for tenant ${tenantId}`);
+
+    const user = await this.prisma.user.findFirst({
+      where: {
+        id: userId,
+        tenantId,
+      },
+    });
+
+    if (!user) {
+      throw new NotFoundException(`User ${userId} not found in tenant ${tenantId}`);
+    }
+
+    const updateData: any = {};
+    if (dto.email !== undefined) updateData.email = dto.email;
+    if (dto.name !== undefined) updateData.name = dto.name;
+    if (dto.role !== undefined) updateData.role = dto.role;
+    if (dto.active !== undefined) updateData.active = dto.active;
+
+    const updatedUser = await this.prisma.user.update({
+      where: { id: userId },
+      data: updateData,
+    });
+
+    this.logger.log(`User updated: ${userId}`);
+
+    return {
+      id: updatedUser.id,
+      email: updatedUser.email,
+      name: updatedUser.name || undefined,
+      firstName: (updatedUser as any).firstName || undefined,
+      lastName: (updatedUser as any).lastName || undefined,
+      role: updatedUser.role,
+      active: updatedUser.active,
+      lastLogin: updatedUser.lastLogin || undefined,
+      createdAt: updatedUser.createdAt,
+    };
+  }
+
+  /**
+   * Delete tenant user
+   */
+  async deleteTenantUser(tenantId: string, userId: string): Promise<void> {
+    this.logger.log(`Deleting user ${userId} from tenant ${tenantId}`);
+
+    const user = await this.prisma.user.findFirst({
+      where: {
+        id: userId,
+        tenantId,
+      },
+    });
+
+    if (!user) {
+      throw new NotFoundException(`User ${userId} not found in tenant ${tenantId}`);
+    }
+
+    // Check if this is the last admin
+    if (user.role === 'ADMIN') {
+      const adminCount = await this.prisma.user.count({
+        where: {
+          tenantId,
+          role: 'ADMIN',
+        },
+      });
+
+      if (adminCount <= 1) {
+        throw new BadRequestException('Cannot delete the last admin user of the tenant');
+      }
+    }
+
+    await this.prisma.user.delete({
+      where: { id: userId },
+    });
+
+    this.logger.log(`User deleted: ${userId}`);
+  }
+
+  /**
+   * Reset tenant user password
+   */
+  async resetTenantUserPassword(tenantId: string, userId: string, newPassword?: string): Promise<{ temporaryPassword?: string }> {
+    this.logger.log(`Resetting password for user ${userId} in tenant ${tenantId}`);
+
+    const user = await this.prisma.user.findFirst({
+      where: {
+        id: userId,
+        tenantId,
+      },
+    });
+
+    if (!user) {
+      throw new NotFoundException(`User ${userId} not found in tenant ${tenantId}`);
+    }
+
+    const bcrypt = require('bcrypt');
+    const password = newPassword || this.generateTemporaryPassword();
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { password: hashedPassword },
+    });
+
+    this.logger.log(`Password reset for user: ${userId}`);
+
+    // If no password was provided, return the generated one
+    if (!newPassword) {
+      return { temporaryPassword: password };
+    }
+
+    return {};
+  }
+
+  /**
+   * Generate temporary password
+   */
+  private generateTemporaryPassword(): string {
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789';
+    let password = '';
+    for (let i = 0; i < 12; i++) {
+      password += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return password;
+  }
+
+  // ============================================
+  // TENANT STATISTICS
+  // ============================================
+
+  /**
+   * Get detailed statistics for a specific tenant
+   */
+  async getTenantStats(tenantId: string): Promise<TenantStatsDto> {
+    this.logger.log(`Fetching statistics for tenant: ${tenantId}`);
+
+    const tenant = await this.prisma.tenant.findUnique({
+      where: { id: tenantId },
+    });
+
+    if (!tenant) {
+      throw new NotFoundException(`Tenant ${tenantId} not found`);
+    }
+
+    const now = new Date();
+    const thisMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    const lastMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const lastMonthEnd = new Date(now.getFullYear(), now.getMonth(), 0);
+
+    // Orders statistics
+    const [totalOrders, ordersThisMonth, ordersLastMonth] = await Promise.all([
+      this.prisma.order.count({ where: { tenantId } }),
+      this.prisma.order.count({
+        where: {
+          tenantId,
+          createdAt: { gte: thisMonthStart },
+        },
+      }),
+      this.prisma.order.count({
+        where: {
+          tenantId,
+          createdAt: {
+            gte: lastMonthStart,
+            lte: lastMonthEnd,
+          },
+        },
+      }),
+    ]);
+
+    // Customers statistics
+    const [totalCustomers, customersThisMonth] = await Promise.all([
+      this.prisma.customer.count({ where: { tenantId } }),
+      this.prisma.customer.count({
+        where: {
+          tenantId,
+          createdAt: { gte: thisMonthStart },
+        },
+      }),
+    ]);
+
+    // Products statistics
+    const [totalProducts, activeProducts] = await Promise.all([
+      this.prisma.product.count({ where: { tenantId } }),
+      this.prisma.product.count({
+        where: {
+          tenantId,
+          active: true,
+        },
+      }),
+    ]);
+
+    // Revenue statistics (from orders)
+    const [revenueThisMonth, revenueLastMonth, revenueTotal] = await Promise.all([
+      this.prisma.order.aggregate({
+        where: {
+          tenantId,
+          createdAt: { gte: thisMonthStart },
+        },
+        _sum: { totalGross: true },
+      }),
+      this.prisma.order.aggregate({
+        where: {
+          tenantId,
+          createdAt: {
+            gte: lastMonthStart,
+            lte: lastMonthEnd,
+          },
+        },
+        _sum: { totalGross: true },
+      }),
+      this.prisma.order.aggregate({
+        where: { tenantId },
+        _sum: { totalGross: true },
+      }),
+    ]);
+
+    return {
+      orders: {
+        total: totalOrders,
+        thisMonth: ordersThisMonth,
+        lastMonth: ordersLastMonth,
+      },
+      customers: {
+        total: totalCustomers,
+        thisMonth: customersThisMonth,
+      },
+      products: {
+        total: totalProducts,
+        active: activeProducts,
+      },
+      revenue: {
+        total: revenueTotal._sum.totalGross?.toNumber() || 0,
+        thisMonth: revenueThisMonth._sum.totalGross?.toNumber() || 0,
+        lastMonth: revenueLastMonth._sum.totalGross?.toNumber() || 0,
+      },
+    };
   }
 }

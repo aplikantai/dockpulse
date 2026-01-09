@@ -46,6 +46,7 @@ export class PlatformController {
 
   // ============ AUTH ============
 
+  @Public()
   @Post('auth/login')
   @ApiOperation({ summary: 'Login administratora platformy' })
   @HttpCode(HttpStatus.OK)

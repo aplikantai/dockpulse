@@ -119,11 +119,77 @@ export interface ModuleCatalogItemDto {
 
 export interface CreateTenantDto {
   name: string;
+  slug?: string;
   domain?: string;
+  template?: string;
+  plan?: string;
   ownerEmail: string;
   ownerName?: string;
+  ownerPassword?: string;
+  settings?: Record<string, any>;
+  branding?: Record<string, any>;
 }
 
-export interface UpdateTenantPlanDto {
-  tenantId: string;
+export interface UpdateTenantDto {
+  name?: string;
+  slug?: string;
+  domain?: string;
+  template?: string;
+  plan?: string;
+  status?: 'active' | 'suspended' | 'deleted';
+  settings?: Record<string, any>;
+  branding?: Record<string, any>;
+}
+
+export interface TenantUserDto {
+  id: string;
+  email: string;
+  name?: string;
+  firstName?: string;
+  lastName?: string;
+  role: string;
+  active: boolean;
+  lastLogin?: Date;
+  createdAt: Date;
+}
+
+export interface CreateTenantUserDto {
+  email: string;
+  name?: string;
+  firstName?: string;
+  lastName?: string;
+  password?: string;
+  role: string;
+  permissions?: string[];
+}
+
+export interface UpdateTenantUserDto {
+  email?: string;
+  name?: string;
+  firstName?: string;
+  lastName?: string;
+  role?: string;
+  active?: boolean;
+  permissions?: string[];
+}
+
+export interface TenantStatsDto {
+  orders: {
+    total: number;
+    thisMonth: number;
+    lastMonth: number;
+  };
+  customers: {
+    total: number;
+    thisMonth: number;
+  };
+  products: {
+    total: number;
+    active: number;
+  };
+  revenue: {
+    total: number;
+    thisMonth: number;
+    lastMonth: number;
+  };
 }

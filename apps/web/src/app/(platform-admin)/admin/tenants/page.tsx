@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { GlassCard } from '@/components/ui/GlassCard';
+import { apiGet, apiPost, ApiError } from '@/lib/api';
 
 interface Tenant {
   id: string;
@@ -31,17 +32,15 @@ export default function TenantsPage() {
   const fetchTenants = async () => {
     try {
       setLoading(true);
-      const response = await fetch('/api/admin/tenants');
-
-      if (!response.ok) {
-        throw new Error('Failed to fetch tenants');
-      }
-
-      const data = await response.json();
+      const data = await apiGet<Tenant[]>('/api/admin/tenants');
       setTenants(data);
       setError(null);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'An error occurred');
+      if (err instanceof ApiError) {
+        setError(`${err.status}: ${err.data?.message || err.statusText}`);
+      } else {
+        setError(err instanceof Error ? err.message : 'An error occurred');
+      }
     } finally {
       setLoading(false);
     }
@@ -314,20 +313,14 @@ function CreateTenantModal({
     setError(null);
 
     try {
-      const response = await fetch('/api/admin/tenants', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Failed to create tenant');
-      }
-
+      await apiPost('/api/admin/tenants', formData);
       onSuccess();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'An error occurred');
+      if (err instanceof ApiError) {
+        setError(err.data?.message || `Error ${err.status}: ${err.statusText}`);
+      } else {
+        setError(err instanceof Error ? err.message : 'An error occurred');
+      }
     } finally {
       setLoading(false);
     }

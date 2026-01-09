@@ -143,3 +143,60 @@ body {
 ::-webkit-scrollbar-thumb:hover {
   background: rgba(0, 0, 0, 0.3);
 }
+
+/* ============================================
+   iOS Glass Design (OMENROUTER Landing)
+   ============================================ */
+:root {
+  --ios-blur: blur(25px);
+}
+
+.glass-ios {
+  background: rgba(255, 255, 255, 0.72);
+  backdrop-filter: var(--ios-blur);
+  -webkit-backdrop-filter: var(--ios-blur);
+  border: 1px solid rgba(255, 255, 255, 0.4);
+}
+
+.glass-ios-dark {
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: var(--ios-blur);
+  -webkit-backdrop-filter: var(--ios-blur);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.apple-shadow {
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.04);
+}
+
+.apple-shadow-hover:hover {
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.08);
+}
+
+.gradient-mesh {
+  background-color: #fbfbfd;
+  background-image:
+    radial-gradient(at 0% 0%, hsla(210,100%,95%,1) 0, transparent 50%),
+    radial-gradient(at 50% 0%, hsla(220,100%,92%,1) 0, transparent 50%),
+    radial-gradient(at 100% 0%, hsla(230,100%,95%,1) 0, transparent 50%);
+}
+
+.animate-float {
+  animation: float 6s ease-in-out infinite;
+}
+
+@keyframes float {
+  0% { transform: translateY(0px); }
+  50% { transform: translateY(-20px); }
+  100% { transform: translateY(0px); }
+}
+
+.glass-effect {
+  background: rgba(255, 255, 255, 0.72);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+}
+
+.ios-shadow {
+  box-shadow: 0 4px 30px rgba(0, 0, 0, 0.08);
+}

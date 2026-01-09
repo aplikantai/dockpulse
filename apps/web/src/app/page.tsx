@@ -2,7 +2,7 @@
 
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { MarketingPage } from '@/components/marketing/MarketingPage';
+import { LandingPage } from '@/components/landing';
 
 export default function HomePage() {
   const router = useRouter();
@@ -25,5 +25,5 @@ export default function HomePage() {
     }
   }, [router]);
 
-  return <MarketingPage />;
+  return <LandingPage />;
 }

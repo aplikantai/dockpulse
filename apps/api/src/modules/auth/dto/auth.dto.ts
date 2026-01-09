@@ -1,11 +1,6 @@
 import { IsEmail, IsString, MinLength, IsOptional, IsEnum } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-
-export enum UserRole {
-  ADMIN = 'admin',
-  MANAGER = 'manager',
-  USER = 'user',
-}
+import { UserRole } from '@prisma/client';
 
 export class LoginDto {
   @ApiProperty({ example: 'user@example.com' })
@@ -32,7 +27,7 @@ export class RegisterDto {
   @IsString()
   name: string;
 
-  @ApiPropertyOptional({ enum: UserRole, default: UserRole.USER })
+  @ApiPropertyOptional({ enum: UserRole, default: UserRole.EMPLOYEE })
   @IsOptional()
   @IsEnum(UserRole)
   role?: UserRole;
@@ -101,5 +96,36 @@ export class ChangePasswordResponse {
 
 export class LogoutResponse {
   @ApiProperty({ example: 'Logged out successfully' })
+  message: string;
+}
+
+// ============================================
+// FORGOT PASSWORD / RESET PASSWORD
+// ============================================
+
+export class ForgotPasswordDto {
+  @ApiProperty({ example: 'user@example.com' })
+  @IsEmail()
+  email: string;
+}
+
+export class ForgotPasswordResponse {
+  @ApiProperty({ example: 'Password reset email sent' })
+  message: string;
+}
+
+export class ResetPasswordDto {
+  @ApiProperty({ example: 'abc-123-def-456' })
+  @IsString()
+  token: string;
+
+  @ApiProperty({ example: 'newPassword456', minLength: 8 })
+  @IsString()
+  @MinLength(8)
+  newPassword: string;
+}
+
+export class ResetPasswordResponse {
+  @ApiProperty({ example: 'Password reset successfully' })
   message: string;
 }

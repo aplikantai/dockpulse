@@ -6,6 +6,7 @@ import { User, Building2, Bell, Shield, Palette, Database, Brain } from 'lucide-
 import Link from 'next/link';
 
 const settingsSections = [
+  { name: 'Użytkownicy', description: 'Zarządzaj użytkownikami i uprawnieniami', icon: User, href: '/settings/users' },
   { name: 'Profil', description: 'Zarządzaj swoim kontem i danymi', icon: User, href: '#' },
   { name: 'Firma', description: 'Dane firmy, logo, dane kontaktowe', icon: Building2, href: '#' },
   { name: 'Powiadomienia', description: 'Preferencje powiadomień email i SMS', icon: Bell, href: '#' },

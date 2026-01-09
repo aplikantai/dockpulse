@@ -106,6 +106,7 @@ export enum ModuleCategory {
   AUTOMATION = 'automation', // Workflows, webhooks
   INTEGRATION = 'integration', // External integrations
   ANALYTICS = 'analytics', // Reports, dashboards
+  PLATFORM = 'platform', // Platform-level modules (AI, onboarding, admin)
   OTHER = 'other',
 }
 

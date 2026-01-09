@@ -14,6 +14,7 @@ const navItems: NavItem[] = [
   { name: 'Dashboard', href: '/admin/dashboard', icon: '📊' },
   { name: 'Tenants', href: '/admin/tenants', icon: '🏢' },
   { name: 'Modules', href: '/admin/modules', icon: '🧩' },
+  { name: 'Admins', href: '/admin/users', icon: '👤' },
 ];
 
 export default function PlatformAdminLayout({ children }: { children: ReactNode }) {

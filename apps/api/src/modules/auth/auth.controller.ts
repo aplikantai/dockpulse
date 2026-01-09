@@ -22,6 +22,10 @@ import {
   ChangePasswordDto,
   ChangePasswordResponse,
   LogoutResponse,
+  ForgotPasswordDto,
+  ForgotPasswordResponse,
+  ResetPasswordDto,
+  ResetPasswordResponse,
 } from './dto/auth.dto';
 import { Public } from './decorators/public.decorator';
 import { CurrentUser, CurrentUserData } from './decorators/current-user.decorator';
@@ -101,5 +105,22 @@ export class AuthController {
   @ApiResponse({ status: 200, description: 'Logged out', type: LogoutResponse })
   async logout(@CurrentUser() user: CurrentUserData): Promise<LogoutResponse> {
     return this.authService.logout(user.userId);
+  }
+
+  @Public()
+  @Post('forgot-password')
+  @ApiOperation({ summary: 'Request password reset' })
+  @ApiResponse({ status: 200, description: 'Reset email sent', type: ForgotPasswordResponse })
+  async forgotPassword(@Body() dto: ForgotPasswordDto): Promise<ForgotPasswordResponse> {
+    return this.authService.forgotPassword(dto);
+  }
+
+  @Public()
+  @Post('reset-password')
+  @ApiOperation({ summary: 'Reset password with token' })
+  @ApiResponse({ status: 200, description: 'Password reset', type: ResetPasswordResponse })
+  @ApiResponse({ status: 401, description: 'Invalid or expired token' })
+  async resetPassword(@Body() dto: ResetPasswordDto): Promise<ResetPasswordResponse> {
+    return this.authService.resetPassword(dto);
   }
 }

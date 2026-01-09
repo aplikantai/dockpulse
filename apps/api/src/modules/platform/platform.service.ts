@@ -13,6 +13,7 @@ import {
   TenantBrandingDto,
   RegisterTenantDto,
 } from './dto/platform.dto';
+import { UserRole } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 import {
   MODULE_REGISTRY,
@@ -116,7 +117,7 @@ export class PlatformService {
         email: dto.adminEmail,
         name: dto.adminName,
         password: hashedPassword,
-        role: 'admin',
+        role: UserRole.ADMIN,
         // active: true, // Removed - field doesn't exist in schema
       },
     });
@@ -817,7 +818,7 @@ export class PlatformService {
         name: dto.adminName,
         // phone: dto.adminPhone, // Removed - field doesn't exist in schema
         password: hashedPassword,
-        role: 'admin',
+        role: UserRole.ADMIN,
         // active: true, // Removed - field doesn't exist in schema
       },
     });

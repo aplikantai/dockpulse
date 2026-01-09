@@ -21,11 +21,23 @@ import { HealthController } from './health.controller';
 import { EventsModule } from './modules/events/events.module';
 import { DataBusModule } from './modules/data-bus/data-bus.module';
 import { ModuleRegistryModule } from './modules/module-registry/module-registry.module';
+import { ModulesModule } from './modules/modules/modules.module';
 import { StockModule } from './modules/stock/stock.module';
 import { CalendarModule } from './modules/calendar/calendar.module';
 import { InvoicingModule } from './modules/invoicing/invoicing.module';
 import { AdminModule } from './modules/admin/admin.module';
 import { WebhooksModule } from './modules/webhooks/webhooks.module';
+import { BranchesModule } from './modules/branches/branches.module';
+import { LocationsModule } from './modules/locations/locations.module';
+import { DictionariesModule } from './modules/dictionaries/dictionaries.module';
+import { MeasurementsModule } from './modules/measurements/measurements.module';
+import { WmsModule } from './modules/wms/wms.module';
+import { ProductionModule } from './modules/production/production.module';
+import { PricingModule } from './modules/pricing/pricing.module';
+import { LoyaltyModule } from './modules/loyalty/loyalty.module';
+import { AiBrandingModule } from './modules/ai-branding/ai-branding.module';
+import { NotificationsModule } from './modules/notifications/notifications.module';
+import { PortalModule } from './modules/portal/portal.module';
 
 @Module({
   imports: [
@@ -51,6 +63,7 @@ import { WebhooksModule } from './modules/webhooks/webhooks.module';
     EventsModule, // EVENT BUS - Must be imported early
     DataBusModule, // DATA BUS - Must be imported early
     ModuleRegistryModule, // MODULE REGISTRY - Must be imported early
+    ModulesModule, // SUBMODULES SYSTEM - Must be imported early
     StorageModule,
     BrandingModule,
     AuthModule,
@@ -67,6 +80,18 @@ import { WebhooksModule } from './modules/webhooks/webhooks.module';
     InvoicingModule, // @invoicing module - extends Order and Customer entities
     WebhooksModule, // @webhooks module - outbound webhooks and event subscriptions
     AdminModule, // Platform Admin Panel
+    // NEW UNIFIED PLATFORM MODULES
+    BranchesModule, // @branches - multi-branch support (from tapparella)
+    LocationsModule, // @locations - pickup points (from ebukieteria, wedliny)
+    DictionariesModule, // @dictionaries - system enums and dictionaries
+    MeasurementsModule, // @measurements - on-site measurements (from tapparella)
+    WmsModule, // @wms - warehouse management system (from wms.ebukieteria.pl)
+    ProductionModule, // @production - production planning (from wedlinyodkaroliny.pl)
+    PricingModule, // @pricing - price tables, surcharges, margins (from tapparella, inconcept)
+    LoyaltyModule, // @loyalty - loyalty program, points, discount codes, tiers (from ebukieteria)
+    AiBrandingModule, // @ai-branding - OMENROUTER: AI brand extraction and tenant onboarding
+    NotificationsModule, // @notifications - Email, SMS, push notifications
+    PortalModule, // @portal - Customer portal with token access, order tracking, quote actions
   ],
   controllers: [HealthController],
   providers: [

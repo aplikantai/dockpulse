@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { GlassCard } from '@/components/ui/GlassCard';
+import { apiGet, ApiError } from '@/lib/api';
 import {
   TrendingUp,
   Users,
@@ -86,17 +87,15 @@ export default function AdminDashboardPage() {
   const fetchDashboardStats = async () => {
     try {
       setLoading(true);
-      const response = await fetch('/api/admin/stats');
-
-      if (!response.ok) {
-        throw new Error('Failed to fetch dashboard stats');
-      }
-
-      const data = await response.json();
+      const data = await apiGet<DashboardStats>('/api/admin/stats');
       setStats(data);
       setError(null);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'An error occurred');
+      if (err instanceof ApiError) {
+        setError(`Error ${err.status}: ${err.data?.message || err.statusText}`);
+      } else {
+        setError(err instanceof Error ? err.message : 'An error occurred');
+      }
     } finally {
       setLoading(false);
     }
